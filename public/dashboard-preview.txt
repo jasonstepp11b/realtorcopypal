@@ -1,0 +1,7 @@
+Please create a dashboard preview image at this location:
+
+public/dashboard-preview.png
+
+The image should be 800x450 pixels and show a screenshot of the RealtorCopyPal dashboard with the dark sidebar and light content area, similar to the design we've implemented.
+
+Until you create this image, the landing page will show a missing image placeholder. 
