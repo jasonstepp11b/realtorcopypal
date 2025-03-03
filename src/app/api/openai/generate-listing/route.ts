@@ -1,5 +1,8 @@
 import { openai } from "@ai-sdk/openai";
 import { NextResponse } from "next/server";
+import { saveProjectContent } from "@/lib/supabase/supabaseUtils";
+import { createServerActionClientFromCookies } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 
 export const runtime = "edge";
 
@@ -16,6 +19,7 @@ export async function POST(req: Request) {
       tone,
       askingPrice,
       hoaFees,
+      projectId, // Get the project ID if provided
     } = await req.json();
 
     // Construct the prompt
@@ -82,6 +86,58 @@ export async function POST(req: Request) {
 
       const data = await response.json();
       variations.push(data.choices[0].message.content.trim());
+    }
+
+    // If a project ID was provided, save the variations to the project
+    if (projectId) {
+      try {
+        // Get the user session
+        const supabase = createServerActionClientFromCookies();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session?.user?.id) {
+          console.error(
+            "No user session found when trying to save project content"
+          );
+        } else {
+          console.log("Saving listing variations to project:", projectId);
+
+          // Create metadata object
+          const metadata = {
+            propertyType,
+            bedrooms,
+            bathrooms,
+            squareFeet,
+            features,
+            sellingPoints,
+            targetBuyer,
+            tone,
+            askingPrice,
+            hoaFees,
+          };
+
+          // Save each variation to the project
+          for (let i = 0; i < variations.length; i++) {
+            const result = await saveProjectContent(
+              projectId,
+              session.user.id,
+              "property-listing",
+              variations[i],
+              { ...metadata, variation: i + 1 }
+            );
+
+            console.log(
+              `Variation ${i + 1} save result:`,
+              result ? "success" : "failed"
+            );
+          }
+        }
+      } catch (saveError) {
+        console.error("Error saving to project:", saveError);
+        // Continue even if saving fails
+      }
     }
 
     return NextResponse.json({ variations });

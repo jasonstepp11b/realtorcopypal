@@ -1,15 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import PropertyListingForm from "@/app/property-listing/PropertyListingForm";
 import PropertyListingResults from "@/app/property-listing/PropertyListingResults";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import { getProject } from "@/lib/supabase/supabaseUtils";
 
 export default function PropertyListingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectId = searchParams?.get("projectId");
+
   const [step, setStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingProject, setIsLoadingProject] = useState(!!projectId);
   const [results, setResults] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     propertyType: "",
@@ -24,7 +29,44 @@ export default function PropertyListingPage() {
     askingPrice: "",
     hoaFees: "",
     propertyImage: undefined as string | undefined,
+    projectId: projectId || undefined,
   });
+
+  // Load project data if projectId is provided
+  useEffect(() => {
+    if (projectId) {
+      loadProjectData(projectId);
+    }
+  }, [projectId]);
+
+  const loadProjectData = async (id: string) => {
+    try {
+      setIsLoadingProject(true);
+      const project = await getProject(id);
+
+      if (project) {
+        setFormData({
+          propertyType: project.property_type || "",
+          bedrooms: project.bedrooms || "",
+          bathrooms: project.bathrooms || "",
+          squareFeet: project.square_feet || "",
+          features: project.features || "",
+          sellingPoints: project.selling_points || "",
+          targetBuyer: project.target_buyer || "",
+          tone: "professional",
+          customTone: "",
+          askingPrice: project.listing_price || "",
+          hoaFees: "",
+          propertyImage: project.image_url,
+          projectId: id,
+        });
+      }
+    } catch (error) {
+      console.error("Error loading project data:", error);
+    } finally {
+      setIsLoadingProject(false);
+    }
+  };
 
   const handleFormSubmit = async (data: typeof formData) => {
     setFormData(data);
@@ -60,6 +102,12 @@ export default function PropertyListingPage() {
   const handleBack = () => {
     setStep(1);
   };
+
+  if (isLoadingProject) {
+    return (
+      <LoadingOverlay isLoading={true} message="Loading project data..." />
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -100,19 +148,11 @@ export default function PropertyListingPage() {
             2
           </div>
         </div>
-        <div className="flex justify-between mt-2">
-          <span className="text-sm font-medium" style={{ color: "#111827" }}>
-            Enter Details
-          </span>
-          <span className="text-sm font-medium" style={{ color: "#111827" }}>
-            Review Results
-          </span>
-        </div>
       </div>
 
       {step === 1 ? (
         <PropertyListingForm
-          formData={formData as any}
+          formData={formData}
           onSubmit={handleFormSubmit as any}
           isGenerating={isGenerating}
         />
@@ -123,13 +163,6 @@ export default function PropertyListingPage() {
           propertyDetails={formData}
         />
       )}
-
-      {/* Loading Overlay */}
-      <LoadingOverlay
-        isLoading={isGenerating}
-        generatorType="property-listing"
-        message="Generating your property listings..."
-      />
     </div>
   );
 }

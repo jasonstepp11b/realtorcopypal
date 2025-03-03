@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/lib/hooks/useAuth";
-import { addDocument } from "@/lib/firebase/firebaseUtils";
+import { useAuth } from "@/lib/hooks/useSupabaseAuth";
+import {
+  saveGeneration,
+  saveProjectContent,
+} from "@/lib/supabase/supabaseUtils";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -26,6 +29,7 @@ interface PropertyListingResultsProps {
     askingPrice: string;
     hoaFees: string;
     propertyImage?: string; // Base64 encoded image
+    projectId?: string; // Add projectId to the interface
   };
 }
 
@@ -40,6 +44,7 @@ export default function PropertyListingResults({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0); // Default first one open
+  const [error, setError] = useState<string | null>(null);
 
   const handleCopy = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
@@ -48,21 +53,62 @@ export default function PropertyListingResults({
   };
 
   const handleSave = async () => {
-    if (selectedIndex === null || !user) return;
+    if (!user || selectedIndex === null) return;
 
-    setIsSaving(true);
     try {
-      await addDocument("listings", {
-        userId: user.uid,
-        content: results[selectedIndex],
-        propertyDetails,
-        createdAt: new Date().toISOString(),
-        type: "property-listing",
-      });
+      setIsSaving(true);
+      setError(null); // Clear any previous errors
+      console.log("Starting save process for property listing");
+
+      // Create metadata for the property listing
+      const metadata = {
+        propertyType: propertyDetails.propertyType,
+        bedrooms: propertyDetails.bedrooms,
+        bathrooms: propertyDetails.bathrooms,
+        squareFeet: propertyDetails.squareFeet,
+        tone: propertyDetails.tone,
+        title: `${propertyDetails.propertyType} - ${propertyDetails.bedrooms} bed, ${propertyDetails.bathrooms} bath`,
+      };
+
+      console.log("Created metadata:", metadata);
+      console.log("User ID:", user.id);
+      console.log("Content type:", "property-listing");
+      console.log("Selected content length:", results[selectedIndex].length);
+      console.log("Project ID:", propertyDetails.projectId);
+
+      let savedContent;
+
+      // If we have a projectId, use saveProjectContent
+      if (propertyDetails.projectId) {
+        savedContent = await saveProjectContent(
+          propertyDetails.projectId,
+          user.id,
+          "property-listing",
+          results[selectedIndex],
+          metadata
+        );
+      } else {
+        // Fallback to saveGeneration if no projectId
+        savedContent = await saveGeneration(
+          user.id,
+          results[selectedIndex],
+          "property-listing",
+          JSON.stringify(metadata)
+        );
+      }
+
+      console.log("Save operation completed, result:", savedContent);
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
       console.error("Error saving listing:", error);
+      setError(
+        "Failed to save. Please try again or check console for details."
+      );
+
+      // Show error for 5 seconds then clear it
+      setTimeout(() => setError(null), 5000);
     } finally {
       setIsSaving(false);
     }
@@ -236,6 +282,11 @@ export default function PropertyListingResults({
         </button>
 
         <div className="flex gap-3">
+          {error && (
+            <div className="text-red-600 font-medium mr-3 self-center">
+              {error}
+            </div>
+          )}
           <button
             onClick={handleExport}
             disabled={selectedIndex === null}

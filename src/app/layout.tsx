@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/lib/contexts/AuthContext";
+import { AuthProvider } from "@/lib/contexts/SupabaseAuthContext";
 import { ThemeProvider } from "@/lib/contexts/ThemeContext";
 import Sidebar from "@/components/Sidebar";
 

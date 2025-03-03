@@ -1,4 +1,4 @@
-import { AuthProvider } from "@/lib/contexts/AuthContext";
+import { AuthProvider } from "@/lib/contexts/SupabaseAuthContext";
 import { ThemeProvider } from "@/lib/contexts/ThemeContext";
 import { Inter, Poppins } from "next/font/google";
 

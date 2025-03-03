@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/lib/hooks/useAuth";
-import { addDocument } from "@/lib/firebase/firebaseUtils";
+import { useAuth } from "@/lib/hooks/useSupabaseAuth";
+import { saveProjectContent } from "@/lib/supabase/supabaseUtils";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -41,6 +41,9 @@ interface SocialMediaResultsProps {
 
     // Style options
     tone: string;
+
+    // Project ID
+    projectId?: string;
   };
 }
 
@@ -55,6 +58,7 @@ export default function SocialMediaResults({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0); // Default first one open
+  const [error, setError] = useState<string | null>(null);
 
   const handleCopy = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
@@ -63,21 +67,84 @@ export default function SocialMediaResults({
   };
 
   const handleSave = async () => {
-    if (selectedIndex === null || !user) return;
+    if (!user || selectedIndex === null) return;
 
-    setIsSaving(true);
     try {
-      await addDocument("listings", {
-        userId: user.uid,
-        content: results[selectedIndex],
-        propertyDetails,
-        createdAt: new Date().toISOString(),
-        type: "social-media",
-      });
+      setIsSaving(true);
+      setError(null); // Clear any previous errors
+      console.log("Starting save process for social media post");
+
+      // Create metadata for the social media post
+      const metadata = {
+        platform: propertyDetails.platform,
+        contentType: "Social Media Post",
+        tone: propertyDetails.tone,
+        propertyAddress: propertyDetails.propertyAddress,
+        listingPrice: propertyDetails.listingPrice,
+        propertyType: propertyDetails.propertyType,
+        bedrooms: propertyDetails.bedrooms,
+        bathrooms: propertyDetails.bathrooms,
+        squareFeet: propertyDetails.squareFeet,
+        hasOpenHouse: propertyDetails.hasOpenHouse,
+        openHouseDetails: propertyDetails.openHouseDetails,
+        keyFeatures: propertyDetails.keyFeatures,
+        neighborhoodHighlights: propertyDetails.neighborhoodHighlights,
+        callToAction: propertyDetails.callToAction,
+        listingAgent: propertyDetails.listingAgent,
+        targetAudience: propertyDetails.targetAudience,
+        hashtags: propertyDetails.hashtags,
+        variation: selectedIndex + 1,
+      };
+
+      console.log("Created metadata:", metadata);
+      console.log("User ID:", user.id);
+      console.log("Content type:", "social-media");
+      console.log("Selected content length:", results[selectedIndex].length);
+      console.log("Project ID:", propertyDetails.projectId);
+
+      if (!propertyDetails.projectId) {
+        setError("Unable to save: No project ID provided. Please try again.");
+        return;
+      }
+
+      // Save to project content
+      const savedContent = await saveProjectContent(
+        propertyDetails.projectId,
+        user.id,
+        "social-media",
+        results[selectedIndex],
+        metadata
+      );
+
+      console.log("Save operation completed, result:", savedContent);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error saving social media post:", error);
+
+      // Handle Supabase errors specifically
+      if (error && typeof error === "object" && "code" in error) {
+        const supabaseError = error as { code: string; message: string };
+        if (supabaseError.code === "42501") {
+          setError("Permission denied. Please make sure you're logged in.");
+        } else if (supabaseError.code === "23503") {
+          setError(
+            "Project not found. Please try again or create a new project."
+          );
+        } else {
+          setError(`Database error: ${supabaseError.message}`);
+        }
+      } else {
+        // Handle other types of errors
+        setError(
+          error instanceof Error
+            ? `Failed to save: ${error.message}`
+            : "Failed to save. Please try again or check console for details."
+        );
+      }
+
+      // Show error for 5 seconds then clear it
+      setTimeout(() => setError(null), 5000);
     } finally {
       setIsSaving(false);
     }
@@ -175,6 +242,9 @@ export default function SocialMediaResults({
       </div>
 
       <div className="mt-6 flex justify-end space-x-4">
+        {error && (
+          <div className="flex-1 text-red-600 font-medium">{error}</div>
+        )}
         <button
           onClick={handleExport}
           disabled={selectedIndex === null}

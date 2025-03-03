@@ -1,5 +1,8 @@
 import { openai } from "@ai-sdk/openai";
 import { NextResponse } from "next/server";
+import { saveProjectContent } from "@/lib/supabase/supabaseUtils";
+import { createServerActionClientFromCookies } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 
 export const runtime = "edge";
 
@@ -59,6 +62,8 @@ export async function POST(req: Request) {
       agentTitle,
       includeTestimonial,
       testimonialText,
+      // Project ID
+      projectId,
     } = data;
 
     // Construct the system prompt based on email type
@@ -248,98 +253,108 @@ export async function POST(req: Request) {
         
         Subject line prefix: ${subject}
         
-        Sequence timing: ${timingDescription}
+        Timing between emails: ${timingDescription}
         
         Initial contact context: ${
-          initialContactContext || "No initial context provided"
+          initialContactContext || "[Context not provided]"
         }
         
-        Sequence goals: ${data.sequenceGoals || "No specific goals provided"}
+        Sequence goals: ${data.sequenceGoals || "[Goals not provided]"}
         
-        Value proposition: ${
-          data.valueProposition || "No value proposition provided"
-        }
+        Value proposition: ${data.valueProposition || "[Not provided]"}
         
-        ${callToAction ? `Primary call to action: ${callToAction}` : ""}
-        ${companyInfo ? `Company/Brokerage information: ${companyInfo}` : ""}
-        ${agentName ? `Agent name: ${agentName}` : ""}
-        ${agentTitle ? `Agent title: ${agentTitle}` : ""}
         ${
-          includeTestimonial
-            ? `Include this testimonial: "${testimonialText}"`
-            : ""
-        }
-        
-        Format requirements:
-        - Create ${numEmails} separate follow-up emails that form a cohesive sequence
-        - Each email should be clearly labeled as "EMAIL #1", "EMAIL #2", etc. at the beginning
-        - Each email should have a unique subject line suggestion, based on the prefix provided
-        - Start the first email with establishing context and value
-        - Each subsequent email should build upon the previous ones
-        - Increase the sense of urgency slightly with each email
-        - Include natural transitions between emails that reference the timing (e.g., "I sent you an email a few days ago...")
-        - Each email should be 150-250 words
-        - Include a professional signature for each email
-        - Ensure each email complies with real estate regulations
-        
-        IMPORTANT: Create all ${numEmails} emails in a single response, separated clearly.
-      `;
-    } else if (emailType === "transactional") {
-      systemPrompt += ` You specialize in creating transactional emails that deliver important information while maintaining a personal touch and encouraging further engagement. You understand the legal and practical requirements of real estate transactions.`;
-
-      userPrompt = `
-        Write a ${tone} transactional email for a real estate ${transactionType} notification.
-        
-        Email subject: ${subject}
-        
-        Target audience: ${targetAudience}
-        ${userName ? `Recipient name: ${userName}` : ""}
-        ${
-          transactionType === "welcome"
-            ? `Company/service information: ${companyInfo}`
-            : ""
-        }
-        ${
-          transactionType === "open-house"
-            ? `Open house details: ${openHouseDetails}`
-            : ""
-        }
-        ${
-          transactionType === "listing-alert"
+          propertyDetails
             ? `Property details: ${propertyDetails}`
-            : ""
-        }
-        ${
-          transactionType === "appointment"
-            ? `Appointment details: ${appointmentDetails}`
-            : ""
+            : "[No property details provided]"
         }
         
         ${callToAction ? `Call to action: ${callToAction}` : ""}
+        ${companyInfo ? `Company/Brokerage information: ${companyInfo}` : ""}
         ${agentName ? `Agent name: ${agentName}` : ""}
         ${agentTitle ? `Agent title: ${agentTitle}` : ""}
+        
+        Format requirements:
+        - Create ${numEmails} distinct emails that build upon each other
+        - Each email should have a unique subject line that starts with the provided prefix
+        - Each email should be 150-250 words
+        - Start each email with "Email #X: " followed by a brief description of its purpose
+        - Include a professional signature with agent name, title, and brokerage information if provided
+        - Ensure the emails comply with real estate regulations by including appropriate disclaimers
+        - Each email should have a clear call to action that advances the prospect through the sales funnel
+        - The sequence should gradually increase urgency while maintaining professionalism
+      `;
+    } else if (emailType === "transactional") {
+      systemPrompt += ` You specialize in creating clear, concise transactional emails that convey important information while maintaining a professional tone. You understand the importance of clarity and completeness in real estate transaction communications.`;
+
+      // Get transaction type display name
+      let transactionTypeDisplay = "";
+      if (transactionType === "other" && data.customTransactionType) {
+        transactionTypeDisplay = data.customTransactionType;
+      } else {
+        transactionTypeDisplay = getTransactionTypeDisplay(
+          transactionType || "offer-accepted"
+        );
+      }
+
+      userPrompt = `
+        Write a ${tone} transactional email for ${transactionTypeDisplay} targeting ${targetAudience}.
+        
+        Email subject: ${subject}
+        
+        Client name: ${data.clientName || "[Client name not provided]"}
+        
         ${
-          includeTestimonial
-            ? `Include this testimonial: "${testimonialText}"`
+          propertyDetails
+            ? `Property details: ${propertyDetails}`
+            : "[No property details provided]"
+        }
+        
+        ${
+          data.transactionDetails
+            ? `Transaction details: ${data.transactionDetails}`
+            : "[No transaction details provided]"
+        }
+        
+        ${
+          data.deadlineDate
+            ? `Deadline/Important date: ${data.deadlineDate}`
             : ""
         }
         
+        ${
+          data.requiredAction
+            ? `Required action: ${data.requiredAction}`
+            : "[No required action specified]"
+        }
+        
+        ${
+          appointmentDetails ? `Appointment details: ${appointmentDetails}` : ""
+        }
+        
+        ${openHouseDetails ? `Open house details: ${openHouseDetails}` : ""}
+        
+        ${callToAction ? `Call to action: ${callToAction}` : ""}
+        ${companyInfo ? `Company/Brokerage information: ${companyInfo}` : ""}
+        ${agentName ? `Agent name: ${agentName}` : ""}
+        ${agentTitle ? `Agent title: ${agentTitle}` : ""}
+        
         Format requirements:
-        - Start with a personalized greeting (use [First Name] if no specific name provided)
-        - Clearly communicate the key information in the first paragraph
-        - Include any necessary details in a clean, scannable format
-        - Suggest a relevant next step or action
+        - Start with a clear, professional greeting
+        - Clearly state the purpose of the email in the first paragraph
+        - Use bullet points to highlight key information, dates, or required actions
+        - Include all relevant details about the transaction, property, or appointment
+        - End with clear next steps and/or call to action
         - Include a professional signature with agent name, title, and brokerage information if provided
-        - Include any necessary real estate disclaimers or legal notices
-        - Total length should be 150-250 words
+        - Ensure the email complies with real estate regulations by including appropriate disclaimers
+        - Total length should be 200-300 words
       `;
     }
 
-    // Generate three variations for broadcast and transactional, but only one for follow-up (since it already has multiple emails)
+    // Generate three variations
     const variations = [];
-    const numVariations = emailType === "follow-up" ? 1 : 3;
 
-    for (let i = 0; i < numVariations; i++) {
+    for (let i = 0; i < 3; i++) {
       const temperature = 0.7 + i * 0.1; // Slightly increase temperature for each variation
 
       const response = await fetch(
@@ -351,13 +366,13 @@ export async function POST(req: Request) {
             Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           },
           body: JSON.stringify({
-            model: "gpt-4o",
+            model: "gpt-4",
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt },
             ],
             temperature: temperature,
-            max_tokens: emailType === "follow-up" ? 1600 : 800, // Increase token limit for follow-up sequences
+            max_tokens: 1500, // Increased for follow-up sequences
           }),
         }
       );
@@ -370,6 +385,44 @@ export async function POST(req: Request) {
       variations.push(result.choices[0].message.content.trim());
     }
 
+    // If projectId is provided, save the content to the project
+    if (projectId) {
+      try {
+        // Get the user ID from the session
+        const supabase = createServerActionClientFromCookies();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session?.user?.id) {
+          // Create metadata object - remove large content fields to keep metadata manageable
+          const metadata = {
+            emailType,
+            subject,
+            targetAudience,
+            tone,
+            broadcastPurpose,
+            transactionType,
+            // Include other relevant fields but exclude large text content
+          };
+
+          // Save each variation to the project
+          for (let i = 0; i < variations.length; i++) {
+            await saveProjectContent(
+              projectId,
+              session.user.id,
+              "email-campaign",
+              variations[i],
+              { ...metadata, variation: i + 1 }
+            );
+          }
+        }
+      } catch (saveError) {
+        console.error("Error saving to project:", saveError);
+        // Continue even if saving fails
+      }
+    }
+
     return NextResponse.json({ variations });
   } catch (error) {
     console.error("Error generating email:", error);
@@ -380,51 +433,62 @@ export async function POST(req: Request) {
   }
 }
 
-// Helper function to get a display name for broadcast purpose
 function getBroadcastPurposeDisplay(purpose: string): string {
   const purposeMap: Record<string, string> = {
     "new-listing": "New Listing Announcement",
     "open-house": "Open House Invitation",
     "just-sold": "Just Sold Announcement",
-    "price-reduction": "Price Reduction Alert",
+    "price-reduction": "Price Reduction Notification",
     "market-update": "Market Update",
     neighborhood: "Neighborhood Newsletter",
     "home-tips": "Seasonal Home Tips",
     "client-event": "Client Appreciation Event",
     holiday: "Holiday/Seasonal Greeting",
     newsletter: "Newsletter",
-    promotion: "Promotion/Special Offer",
-    event: "Event Announcement",
+    promotion: "Promotion",
   };
 
   return purposeMap[purpose] || purpose;
 }
 
-// Helper function to get a display name for follow-up sequence type
 function getSequenceTypeDisplay(sequenceType: string): string {
-  const sequenceMap: Record<string, string> = {
-    "market-report": "Market Report Opt-in Follow-ups",
-    "open-house": "Open House Attendee Follow-ups",
-    "property-interest": "Property Interest Follow-ups",
-    "buyer-consultation": "Buyer Consultation Follow-ups",
-    "listing-presentation": "Listing Presentation Follow-ups",
+  const sequenceTypeMap: Record<string, string> = {
+    "market-report": "Market Report Sequence",
+    "buyer-nurture": "Buyer Nurturing Sequence",
+    "seller-nurture": "Seller Nurturing Sequence",
+    "listing-expired": "Expired Listing Sequence",
+    "past-client": "Past Client Re-engagement",
+    "open-house-follow-up": "Open House Follow-up",
   };
 
-  return sequenceMap[sequenceType] || sequenceType;
+  return sequenceTypeMap[sequenceType] || sequenceType;
 }
 
-// Helper function to get a description of the timing between emails
 function getTimingDescription(timing: string): string {
   const timingMap: Record<string, string> = {
-    "3-5-7":
-      "3 days after initial contact, then 5 days later, then 7 days later",
-    "7-14-21":
-      "7 days after initial contact, then 14 days later, then 21 days later",
-    "2-3-4":
-      "2 days after initial contact, then 3 days later, then 4 days later",
-    "5-10-15":
-      "5 days after initial contact, then 10 days later, then 15 days later",
+    "3-5-7": "Day 1, Day 3, Day 7",
+    "2-4-6": "Day 2, Day 4, Day 6",
+    weekly: "Once per week for 3 weeks",
+    biweekly: "Every two weeks for 6 weeks",
+    monthly: "Once per month for 3 months",
   };
 
   return timingMap[timing] || timing;
+}
+
+function getTransactionTypeDisplay(transactionType: string): string {
+  const transactionTypeMap: Record<string, string> = {
+    "offer-accepted": "Offer Accepted",
+    "inspection-scheduled": "Inspection Scheduled",
+    "inspection-results": "Inspection Results",
+    "closing-scheduled": "Closing Scheduled",
+    "closing-confirmation": "Closing Confirmation",
+    "showing-scheduled": "Showing Scheduled",
+    "showing-feedback": "Showing Feedback",
+    "listing-agreement": "Listing Agreement",
+    "price-adjustment": "Price Adjustment",
+    "contract-update": "Contract Update",
+  };
+
+  return transactionTypeMap[transactionType] || transactionType;
 }

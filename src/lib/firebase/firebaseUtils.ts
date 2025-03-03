@@ -31,35 +31,15 @@ import { Firestore } from "firebase/firestore";
 import { FirebaseStorage } from "firebase/storage";
 import { logEvent } from "firebase/analytics";
 
-// Mock data storage for development without Firebase
-const mockStorage: Record<string, any[]> = {
-  savedListings: [],
-  users: [],
-};
-
 // Auth functions
 export const logoutUser = async () => {
-  if (auth) {
-    return (auth as Auth).signOut();
-  }
-  console.log("Mock logout");
-  return Promise.resolve();
+  return auth.signOut();
 };
 
 export const signInWithGoogle = async () => {
-  if (!auth) {
-    console.log("Firebase auth not configured. Using mock sign-in.");
-    const mockUser = {
-      uid: "mock-user-id",
-      email: "mock-user@example.com",
-      displayName: "Mock User",
-    } as User;
-    return mockUser;
-  }
-
   try {
     const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth as Auth, provider);
+    const result = await signInWithPopup(auth, provider);
 
     // Check if this is a new user and create a profile document if needed
     await createUserProfileIfNeeded(result.user);
@@ -76,22 +56,8 @@ export const signUpWithEmail = async (
   password: string,
   displayName: string
 ) => {
-  if (!auth) {
-    console.log("Firebase auth not configured. Using mock sign-up.");
-    const mockUser = {
-      uid: `mock-user-${Date.now()}`,
-      email,
-      displayName,
-    } as User;
-    return mockUser;
-  }
-
   try {
-    const result = await createUserWithEmailAndPassword(
-      auth as Auth,
-      email,
-      password
-    );
+    const result = await createUserWithEmailAndPassword(auth, email, password);
 
     // Update the user's display name
     if (result.user) {
@@ -115,19 +81,9 @@ export const signInWithEmailAndPassword = async (
   email: string,
   password: string
 ) => {
-  if (!auth) {
-    console.log("Firebase auth not configured. Using mock sign-in.");
-    const mockUser = {
-      uid: "mock-user-id",
-      email,
-      displayName: "Mock User",
-    } as User;
-    return mockUser;
-  }
-
   try {
     const result = await firebaseSignInWithEmailAndPassword(
-      auth as Auth,
+      auth,
       email,
       password
     );
@@ -139,13 +95,8 @@ export const signInWithEmailAndPassword = async (
 };
 
 export const resetPassword = async (email: string) => {
-  if (!auth) {
-    console.log("Firebase auth not configured. Mock password reset.");
-    return Promise.resolve();
-  }
-
   try {
-    await sendPasswordResetEmail(auth as Auth, email);
+    await sendPasswordResetEmail(auth, email);
   } catch (error) {
     console.error("Error sending password reset email", error);
     throw error;
@@ -154,7 +105,7 @@ export const resetPassword = async (email: string) => {
 
 // User profile functions
 export const createUserProfileIfNeeded = async (user: User) => {
-  if (!db || !user) return;
+  if (!user) return;
 
   try {
     // Check if the user profile already exists
@@ -190,21 +141,6 @@ export const createUserProfileIfNeeded = async (user: User) => {
 };
 
 export const getUserProfile = async (userId: string) => {
-  if (!db) {
-    console.log(`Mock getting user profile for ${userId}`);
-    return {
-      id: userId,
-      email: "mock-user@example.com",
-      displayName: "Mock User",
-      generationCount: 0,
-      subscription: {
-        plan: "free",
-        startDate: new Date().toISOString(),
-        endDate: null,
-      },
-    };
-  }
-
   try {
     const userRef = doc(db, "users", userId);
     const userSnap = await getDoc(userRef);
@@ -224,11 +160,6 @@ export const getUserProfile = async (userId: string) => {
 };
 
 export const updateUserProfile = async (userId: string, data: any) => {
-  if (!db) {
-    console.log(`Mock updating user profile for ${userId}:`, data);
-    return;
-  }
-
   try {
     const userRef = doc(db, "users", userId);
     await updateDoc(userRef, data);
@@ -240,15 +171,6 @@ export const updateUserProfile = async (userId: string, data: any) => {
 
 // Firestore functions
 export const addDocument = async (collectionName: string, data: any) => {
-  if (!db) {
-    console.log(`Mock adding document to ${collectionName}:`, data);
-    const id = `mock-id-${Date.now()}`;
-    const newDoc = { id, ...data, createdAt: new Date().toISOString() };
-    mockStorage[collectionName] = mockStorage[collectionName] || [];
-    mockStorage[collectionName].push(newDoc);
-    return { id };
-  }
-
   try {
     const docRef = await addDoc(collection(db, collectionName), {
       ...data,
@@ -256,21 +178,12 @@ export const addDocument = async (collectionName: string, data: any) => {
     });
     return { id: docRef.id };
   } catch (error) {
-    console.error(`Error adding document to ${collectionName}`, error);
+    console.error(`Error adding document to ${collectionName}:`, error);
     throw error;
   }
 };
 
 export const getDocuments = async (collectionName: string, userId?: string) => {
-  if (!db) {
-    console.log(`Mock getting documents from ${collectionName}`);
-    const docs = mockStorage[collectionName] || [];
-    if (userId) {
-      return docs.filter((doc) => doc.userId === userId);
-    }
-    return docs;
-  }
-
   try {
     let q;
     if (userId) {
@@ -299,26 +212,13 @@ export const updateDocument = async (
   id: string,
   data: any
 ) => {
-  if (!db) {
-    console.log(`Mock updating document in ${collectionName}:`, id, data);
-    mockStorage[collectionName] = mockStorage[collectionName] || [];
-    const index = mockStorage[collectionName].findIndex((doc) => doc.id === id);
-    if (index !== -1) {
-      mockStorage[collectionName][index] = {
-        ...mockStorage[collectionName][index],
-        ...data,
-        updatedAt: new Date().toISOString(),
-      };
-    }
-    return;
-  }
-
   try {
     const docRef = doc(db, collectionName, id);
     await updateDoc(docRef, {
       ...data,
       updatedAt: Timestamp.now(),
     });
+    return { id };
   } catch (error) {
     console.error(`Error updating document in ${collectionName}`, error);
     throw error;
@@ -326,17 +226,9 @@ export const updateDocument = async (
 };
 
 export const deleteDocument = async (collectionName: string, id: string) => {
-  if (!db) {
-    console.log(`Mock deleting document from ${collectionName}:`, id);
-    mockStorage[collectionName] = mockStorage[collectionName] || [];
-    mockStorage[collectionName] = mockStorage[collectionName].filter(
-      (doc) => doc.id !== id
-    );
-    return;
-  }
-
   try {
     await deleteDoc(doc(db, collectionName, id));
+    return { success: true };
   } catch (error) {
     console.error(`Error deleting document from ${collectionName}`, error);
     throw error;
@@ -345,11 +237,6 @@ export const deleteDocument = async (collectionName: string, id: string) => {
 
 // Storage functions
 export const uploadFile = async (file: File, path: string) => {
-  if (!storage) {
-    console.log(`Mock uploading file to ${path}`);
-    return `https://mock-storage-url.com/${path}`;
-  }
-
   try {
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, file);
@@ -360,13 +247,7 @@ export const uploadFile = async (file: File, path: string) => {
   }
 };
 
-// Increment user's generation count
 export const incrementGenerationCount = async (userId: string) => {
-  if (!db) {
-    console.log(`Mock incrementing generation count for user ${userId}`);
-    return;
-  }
-
   try {
     const userRef = doc(db, "users", userId);
     await updateDoc(userRef, {
@@ -374,21 +255,15 @@ export const incrementGenerationCount = async (userId: string) => {
     });
   } catch (error) {
     console.error("Error incrementing generation count", error);
+    throw error;
   }
 };
 
-// Add a new function to check email verification status
 export const isEmailVerified = (user: User | null): boolean => {
   return user?.emailVerified || false;
 };
 
-// Add a function to resend verification email
 export const resendVerificationEmail = async (user: User): Promise<void> => {
-  if (!auth) {
-    console.log("Firebase auth not configured. Mock resend verification.");
-    return Promise.resolve();
-  }
-
   try {
     await sendEmailVerification(user);
   } catch (error) {
@@ -397,29 +272,22 @@ export const resendVerificationEmail = async (user: User): Promise<void> => {
   }
 };
 
-// Function to save generated content
 export const saveGeneratedContent = async (
   userId: string,
   contentType: string,
   content: string,
   metadata: any
 ) => {
-  if (!db) {
-    console.log(`Mock saving generated content for user ${userId}`);
-    const id = `mock-id-${Date.now()}`;
-    return { id };
-  }
-
   try {
-    // Increment the user's generation count
+    // First increment the user's generation count
     await incrementGenerationCount(userId);
 
-    // Add the content to the listings collection
-    const docRef = await addDoc(collection(db, "listings"), {
+    // Then save the generated content
+    const docRef = await addDoc(collection(db, "generated-content"), {
       userId,
-      type: contentType, // "property-listing", "social-media", or "email-campaign"
+      contentType,
       content,
-      ...metadata,
+      metadata,
       createdAt: Timestamp.now(),
     });
 
@@ -430,15 +298,6 @@ export const saveGeneratedContent = async (
   }
 };
 
-// Define plan limits
-const PLAN_LIMITS = {
-  free: 5,
-  starter: 50,
-  professional: 200,
-  team: 1000,
-};
-
-// Function to check if user has exceeded their generation limit
 export const checkUsageLimit = async (
   userId: string
 ): Promise<{
@@ -447,41 +306,53 @@ export const checkUsageLimit = async (
   limit: number;
   percentUsed: number;
 }> => {
-  if (!db) {
-    console.log(`Mock checking usage limit for user ${userId}`);
-    return {
-      canGenerate: true,
-      currentUsage: 0,
-      limit: PLAN_LIMITS.free,
-      percentUsed: 0,
-    };
-  }
-
   try {
-    // Get the user's profile
+    // Get the user profile to check their subscription plan
     const userProfile = await getUserProfile(userId);
 
     if (!userProfile) {
       throw new Error("User profile not found");
     }
 
-    // Get the user's subscription plan and generation count
-    const plan = userProfile.subscription?.plan || "free";
-    const generationCount = userProfile.generationCount || 0;
+    // Define the user profile type
+    interface UserProfile {
+      id: string;
+      subscription?: {
+        plan?: string;
+      };
+      generationCount?: number;
+      [key: string]: any;
+    }
 
-    // Get the limit for the user's plan
-    const limit =
-      PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
+    // Cast the userProfile to the defined type
+    const typedProfile = userProfile as UserProfile;
 
-    // Calculate percentage used
-    const percentUsed = Math.min(
-      Math.round((generationCount / limit) * 100),
-      100
-    );
+    // Default limits based on subscription plan
+    let limit = 5; // Free plan default
+
+    if (typedProfile.subscription && typedProfile.subscription.plan) {
+      switch (typedProfile.subscription.plan) {
+        case "basic":
+          limit = 25;
+          break;
+        case "premium":
+          limit = 100;
+          break;
+        case "unlimited":
+          limit = Infinity;
+          break;
+        default:
+          limit = 5; // Free plan
+      }
+    }
+
+    const currentUsage = typedProfile.generationCount || 0;
+    const percentUsed = limit === Infinity ? 0 : (currentUsage / limit) * 100;
+    const canGenerate = currentUsage < limit;
 
     return {
-      canGenerate: generationCount < limit,
-      currentUsage: generationCount,
+      canGenerate,
+      currentUsage,
       limit,
       percentUsed,
     };
@@ -491,19 +362,68 @@ export const checkUsageLimit = async (
   }
 };
 
-// Function to track analytics events
 export const trackEvent = (
   eventName: string,
   eventParams?: Record<string, any>
 ) => {
-  if (!analytics) {
-    console.log(`Mock tracking event: ${eventName}`, eventParams);
-    return;
+  if (analytics) {
+    try {
+      logEvent(analytics, eventName, eventParams);
+    } catch (error) {
+      console.error(`Error tracking event ${eventName}:`, error);
+    }
   }
+};
 
+export const getGeneratedContent = async (
+  userId: string,
+  contentType?: string
+) => {
   try {
-    logEvent(analytics, eventName, eventParams);
+    console.log(
+      "getGeneratedContent called with userId:",
+      userId,
+      "contentType:",
+      contentType
+    );
+    let q;
+
+    if (contentType) {
+      // If contentType is provided, filter by both userId and contentType
+      console.log("Creating query with userId and contentType filters");
+      q = query(
+        collection(db, "generated-content"),
+        where("userId", "==", userId),
+        where("contentType", "==", contentType),
+        orderBy("createdAt", "desc")
+      );
+    } else {
+      // If no contentType is provided, just filter by userId
+      console.log("Creating query with only userId filter");
+      q = query(
+        collection(db, "generated-content"),
+        where("userId", "==", userId),
+        orderBy("createdAt", "desc")
+      );
+    }
+
+    console.log("Executing Firestore query...");
+    const querySnapshot = await getDocs(q);
+    console.log("Query returned", querySnapshot.size, "documents");
+
+    const results = querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(), // Convert Firestore Timestamp to JS Date
+      };
+    });
+
+    console.log("Processed results:", results);
+    return results;
   } catch (error) {
-    console.error(`Error tracking event ${eventName}:`, error);
+    console.error("Error in getGeneratedContent:", error);
+    throw error;
   }
 };

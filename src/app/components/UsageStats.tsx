@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/hooks/useAuth";
-import { checkUsageLimit } from "@/lib/firebase/firebaseUtils";
+import { useAuth } from "@/lib/hooks/useSupabaseAuth";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase/supabase";
 
 export default function UsageStats() {
   const { user } = useAuth();
@@ -23,8 +23,46 @@ export default function UsageStats() {
       try {
         setIsLoading(true);
         setError(null);
-        const stats = await checkUsageLimit(user.uid);
-        setUsageStats(stats);
+
+        // Get the count of generations for this user
+        const { count, error: countError } = await supabase
+          .from("generations")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id);
+
+        if (countError) throw countError;
+
+        // Get the user's subscription plan from their profile
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("subscription_plan")
+          .eq("id", user.id)
+          .single();
+
+        if (profileError) throw profileError;
+
+        // Determine the limit based on the subscription plan
+        // Default to free plan if not specified
+        const plan = profile?.subscription_plan || "free";
+
+        let limit = 5; // Free plan
+        if (plan === "starter") limit = 50;
+        else if (plan === "professional") limit = 200;
+        else if (plan === "team") limit = 500;
+
+        const currentUsage = count || 0;
+        const percentUsed = Math.min(
+          Math.round((currentUsage / limit) * 100),
+          100
+        );
+        const canGenerate = currentUsage < limit;
+
+        setUsageStats({
+          canGenerate,
+          currentUsage,
+          limit,
+          percentUsed,
+        });
       } catch (error) {
         console.error("Error fetching usage stats:", error);
         setError("Failed to load usage statistics");

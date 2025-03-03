@@ -1,5 +1,8 @@
 import { openai } from "@ai-sdk/openai";
 import { NextResponse } from "next/server";
+import { saveProjectContent } from "@/lib/supabase/supabaseUtils";
+import { createServerActionClientFromCookies } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 
 export const runtime = "edge";
 
@@ -22,6 +25,7 @@ export async function POST(req: Request) {
       targetAudience,
       hashtags,
       tone,
+      projectId, // Get the project ID if provided
     } = await req.json();
 
     // Construct the prompt
@@ -112,6 +116,53 @@ export async function POST(req: Request) {
 
       const data = await response.json();
       variations.push(data.choices[0].message.content.trim());
+    }
+
+    // If projectId is provided, save the content to the project
+    if (projectId) {
+      try {
+        // Get the user ID from the session
+        const supabase = createServerActionClientFromCookies();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session?.user?.id) {
+          // Create metadata object
+          const metadata = {
+            propertyAddress,
+            listingPrice,
+            propertyType,
+            bedrooms,
+            bathrooms,
+            squareFeet,
+            hasOpenHouse,
+            openHouseDetails,
+            keyFeatures,
+            neighborhoodHighlights,
+            callToAction,
+            listingAgent,
+            platform,
+            targetAudience,
+            hashtags,
+            tone,
+          };
+
+          // Save each variation to the project
+          for (let i = 0; i < variations.length; i++) {
+            await saveProjectContent(
+              projectId,
+              session.user.id,
+              "social-media",
+              variations[i],
+              { ...metadata, variation: i + 1 }
+            );
+          }
+        }
+      } catch (saveError) {
+        console.error("Error saving to project:", saveError);
+        // Continue even if saving fails
+      }
     }
 
     return NextResponse.json({ variations });

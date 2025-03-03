@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/hooks/useAuth";
-import { addDocument } from "@/lib/firebase/firebaseUtils";
+import { useAuth } from "@/lib/hooks/useSupabaseAuth";
+import { saveGeneration } from "@/lib/supabase/supabaseUtils";
 import {
   ArrowLeftIcon,
   CheckIcon,
@@ -12,6 +12,10 @@ import {
   EnvelopeIcon,
   ArrowPathIcon,
   BellAlertIcon,
+  DocumentTextIcon,
+  CheckCircleIcon,
+  DocumentArrowDownIcon,
+  ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
 
 interface EmailCampaignResultsProps {
@@ -43,16 +47,27 @@ export default function EmailCampaignResults({
   const [copied, setCopied] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const parseFollowUpSequence = (content: string) => {
     if (emailType !== "follow-up") return [content];
 
     const emailRegex = /EMAIL #\d+/g;
-    const parts = content.split(emailRegex);
+    const matches = content.match(emailRegex);
 
-    const emails = parts.slice(1);
+    if (!matches) return [content];
 
-    return emails.length > 1 ? emails : [content];
+    const emails = [];
+    for (let i = 0; i < matches.length; i++) {
+      const currentMatch = matches[i];
+      const nextMatch = matches[i + 1];
+      const startIndex = content.indexOf(currentMatch) + currentMatch.length;
+      const endIndex = nextMatch ? content.indexOf(nextMatch) : content.length;
+
+      emails.push(content.slice(startIndex, endIndex).trim());
+    }
+
+    return emails;
   };
 
   const currentEmails =
@@ -72,41 +87,95 @@ export default function EmailCampaignResults({
   };
 
   const handleSave = async () => {
-    if (!user) {
-      alert("Please sign in to save this content");
-      return;
-    }
+    if (!user) return;
 
-    setSaving(true);
     try {
-      const docData = {
-        userId: user.uid,
-        content:
-          emailType === "follow-up" ? results[selectedIndex] : currentEmail,
-        propertyDetails: {
-          propertyType: emailType,
-          targetBuyer: emailDetails.targetAudience,
-          tone: emailDetails.tone,
-          sequenceType:
-            emailDetails.followUpSequenceType === "other"
-              ? emailDetails.customSequenceType
-              : emailDetails.followUpSequenceType,
-          numberOfEmails: emailDetails.numberOfEmails,
-        },
-        createdAt: new Date().toISOString(),
-        type: "email-campaign",
-        emailType: emailType,
-        subject: emailDetails.subject,
-      };
+      setSaving(true);
+      setError(null); // Clear any previous errors
+      console.log("Starting save process for email campaign");
 
-      await addDocument("listings", docData);
+      const selectedContent = results[selectedIndex];
+      const emails = parseFollowUpSequence(selectedContent);
+
+      // For follow-up sequences, save all emails in the sequence
+      if (emailType === "follow-up" && emails.length > 1) {
+        console.log(
+          `Saving all ${emails.length} emails in the follow-up sequence`
+        );
+
+        // Save each email in the sequence
+        const savePromises = emails.map((emailContent, i) => {
+          // Create metadata for the email campaign
+          const metadata = JSON.stringify({
+            emailType: emailDetails.emailType,
+            subject: `${emailDetails.subject} - Email ${i + 1} of ${
+              emails.length
+            }`,
+            tone: emailDetails.tone,
+            contentType: "Email Campaign",
+            sequenceNumber: i + 1,
+            totalInSequence: emails.length,
+            sequenceType: emailDetails.followUpSequenceType || "follow-up",
+          });
+
+          console.log(`Preparing to save email ${i + 1} of ${emails.length}`);
+
+          // Return the promise but don't await it yet
+          return saveGeneration(
+            user.id,
+            emailContent,
+            "email-campaign",
+            metadata
+          );
+        });
+
+        // Wait for all saves to complete
+        await Promise.all(savePromises);
+        console.log("All emails in sequence saved successfully");
+      } else {
+        // For broadcast or transactional emails, or if there's only one email in the follow-up
+        const contentToSave =
+          emailType === "follow-up" && emails.length > 1
+            ? emails[selectedEmailInSequence]
+            : selectedContent;
+
+        // Create metadata for the email campaign
+        const metadata = JSON.stringify({
+          emailType: emailDetails.emailType,
+          subject: emailDetails.subject,
+          tone: emailDetails.tone,
+          contentType: "Email Campaign",
+          sequenceType: emailType,
+        });
+
+        console.log("Created metadata:", metadata);
+        console.log("User ID:", user.id);
+        console.log("Content type:", "email-campaign");
+        console.log("Selected content length:", contentToSave.length);
+
+        // Save to Supabase
+        await saveGeneration(
+          user.id,
+          contentToSave,
+          "email-campaign",
+          metadata
+        );
+      }
+
+      console.log("Save operation completed successfully");
+
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      setSaving(false); // Ensure saving state is reset
+      setTimeout(() => setSaved(false), 3000);
     } catch (error) {
-      console.error("Error saving email:", error);
-      alert("Failed to save email. Please try again.");
-    } finally {
-      setSaving(false);
+      console.error("Error saving email campaign:", error);
+      setError(
+        "Failed to save. Please try again or check console for details."
+      );
+      setSaving(false); // Ensure saving state is reset even on error
+
+      // Show error for 5 seconds then clear it
+      setTimeout(() => setError(null), 5000);
     }
   };
 
@@ -253,6 +322,12 @@ export default function EmailCampaignResults({
           </div>
 
           <div className="flex flex-wrap gap-3 justify-end">
+            {error && (
+              <div className="text-red-600 font-medium mr-3 self-center">
+                {error}
+              </div>
+            )}
+
             <button
               onClick={() => handleCopy(currentEmail)}
               className="btn btn-outline flex items-center"
@@ -348,6 +423,32 @@ export default function EmailCampaignResults({
             </>
           )}
         </ul>
+      </div>
+
+      <div className="mt-6 flex justify-end space-x-4">
+        {error && (
+          <div className="flex-1 text-red-600 font-medium">{error}</div>
+        )}
+        <button
+          onClick={handleSave}
+          disabled={!user || saving}
+          className={`flex items-center px-4 py-2 rounded-md text-white ${
+            !user || saving
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          {saving ? (
+            "Saving..."
+          ) : saved ? (
+            <>
+              <CheckIcon className="h-5 w-5 mr-2" />
+              Saved!
+            </>
+          ) : (
+            "Save to Library"
+          )}
+        </button>
       </div>
     </div>
   );

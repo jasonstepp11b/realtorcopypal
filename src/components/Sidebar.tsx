@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/hooks/useSupabaseAuth";
 import { useState } from "react";
 import Image from "next/image";
+import RecentProjects from "./RecentProjects";
 
 // Icons
 import {
@@ -17,15 +18,25 @@ import {
   ArrowLeftOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
+  BookmarkIcon,
+  PlusIcon,
 } from "@heroicons/react/24/outline";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, signInWithGoogle, signOut } = useAuth();
+  const router = useRouter();
+  const { user, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Updated navigation with Properties as the main focus
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
+    { name: "Properties", href: "/projects", icon: BuildingOffice2Icon },
+    { name: "My Saved Content", href: "/my-content", icon: BookmarkIcon },
+  ];
+
+  // Tools navigation - moved to a separate section
+  const toolsNavigation = [
     {
       name: "Property Listings",
       href: "/property-listing",
@@ -37,6 +48,10 @@ export default function Sidebar() {
 
   const isActive = (path: string) => {
     return pathname === path;
+  };
+
+  const handleSignIn = () => {
+    router.push("/auth/sign-in");
   };
 
   return (
@@ -123,6 +138,51 @@ export default function Sidebar() {
                 {item.name}
               </Link>
             ))}
+
+            {/* Create Property button */}
+            <Link
+              href="/projects/new"
+              className="group flex items-center px-4 py-3 mt-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <PlusIcon
+                className="mr-3 h-5 w-5 text-white"
+                aria-hidden="true"
+              />
+              Create Property
+            </Link>
+
+            {/* Recent Projects component */}
+            <RecentProjects />
+
+            {/* Tools section */}
+            <div className="mt-8 pt-4 border-t border-gray-700">
+              <h3 className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Content Tools
+              </h3>
+              <div className="mt-2 space-y-1">
+                {toolsNavigation.map((item) => (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`group flex items-center px-4 py-2 text-sm font-medium rounded-md ${
+                      isActive(item.href)
+                        ? "bg-gray-800 text-white"
+                        : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                    }`}
+                  >
+                    <item.icon
+                      className={`mr-3 h-5 w-5 ${
+                        isActive(item.href)
+                          ? "text-white"
+                          : "text-gray-400 group-hover:text-white"
+                      }`}
+                      aria-hidden="true"
+                    />
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
           </nav>
         </div>
 
@@ -139,20 +199,10 @@ export default function Sidebar() {
             {user ? (
               <div className="mt-3 px-4">
                 <div className="flex items-center">
-                  {user.photoURL ? (
-                    <Image
-                      src={user.photoURL}
-                      alt={user.displayName || "User"}
-                      width={32}
-                      height={32}
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <UserCircleIcon className="h-8 w-8 text-gray-400" />
-                  )}
+                  <UserCircleIcon className="h-8 w-8 text-gray-400" />
                   <div className="ml-3">
                     <p className="text-sm font-medium text-white">
-                      {user.displayName || user.email}
+                      {user.email}
                     </p>
                   </div>
                 </div>
@@ -166,7 +216,7 @@ export default function Sidebar() {
               </div>
             ) : (
               <button
-                onClick={signInWithGoogle}
+                onClick={handleSignIn}
                 className="mt-3 flex w-full items-center px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700"
               >
                 Sign In

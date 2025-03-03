@@ -1,15 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import SocialMediaForm from "@/app/social-media/SocialMediaForm";
 import SocialMediaResults from "@/app/social-media/SocialMediaResults";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import { getProject } from "@/lib/supabase/supabaseUtils";
 
 export default function SocialMediaPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectId = searchParams?.get("projectId");
+
   const [step, setStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingProject, setIsLoadingProject] = useState(!!projectId);
   const [results, setResults] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     // Core property information
@@ -43,12 +48,46 @@ export default function SocialMediaPage() {
     customTone: "",
   });
 
+  // Load project data if projectId is provided
+  useEffect(() => {
+    if (projectId) {
+      loadProjectData(projectId);
+    }
+  }, [projectId]);
+
+  const loadProjectData = async (id: string) => {
+    try {
+      setIsLoadingProject(true);
+      const project = await getProject(id);
+
+      if (project) {
+        setFormData({
+          ...formData,
+          propertyAddress: project.address || "",
+          listingPrice: project.listing_price || "",
+          propertyType: project.property_type || "",
+          bedrooms: project.bedrooms || "",
+          bathrooms: project.bathrooms || "",
+          squareFeet: project.square_feet || "",
+          primaryPhoto: project.image_url || "",
+          keyFeatures: project.features || "",
+          neighborhoodHighlights: project.neighborhood_highlights || "",
+          targetAudience: project.target_buyer || "",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading project data:", error);
+    } finally {
+      setIsLoadingProject(false);
+    }
+  };
+
   const handleFormSubmit = async (data: typeof formData) => {
     setFormData(data);
     setIsGenerating(true);
 
     try {
-      // Create a copy of the data without the images for the API request
+      // Create a copy of the data without the image for the API request
       const { primaryPhoto, ...apiData } = data;
 
       const response = await fetch("/api/openai/generate-social-post", {
@@ -56,7 +95,10 @@ export default function SocialMediaPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(apiData),
+        body: JSON.stringify({
+          ...apiData,
+          projectId,
+        }),
       });
 
       if (!response.ok) {
@@ -78,6 +120,12 @@ export default function SocialMediaPage() {
     setStep(1);
   };
 
+  if (isLoadingProject) {
+    return (
+      <LoadingOverlay isLoading={true} message="Loading project data..." />
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-8">
@@ -85,8 +133,8 @@ export default function SocialMediaPage() {
           Social Media Post Generator
         </h1>
         <p style={{ color: "#111827" }}>
-          Create engaging social media posts that showcase your properties and
-          attract potential buyers.
+          Create engaging social media content to promote your property listings
+          and connect with potential buyers.
         </p>
       </div>
 
@@ -117,19 +165,11 @@ export default function SocialMediaPage() {
             2
           </div>
         </div>
-        <div className="flex justify-between mt-2">
-          <span className="text-sm font-medium" style={{ color: "#111827" }}>
-            Enter Details
-          </span>
-          <span className="text-sm font-medium" style={{ color: "#111827" }}>
-            Review Results
-          </span>
-        </div>
       </div>
 
       {step === 1 ? (
         <SocialMediaForm
-          formData={formData as any}
+          formData={formData}
           onSubmit={handleFormSubmit as any}
           isGenerating={isGenerating}
         />
@@ -137,16 +177,12 @@ export default function SocialMediaPage() {
         <SocialMediaResults
           results={results}
           onBack={handleBack}
-          propertyDetails={formData}
+          propertyDetails={{
+            ...formData,
+            projectId: projectId || undefined,
+          }}
         />
       )}
-
-      {/* Loading Overlay */}
-      <LoadingOverlay
-        isLoading={isGenerating}
-        generatorType="social-media"
-        message="Generating your social media posts..."
-      />
     </div>
   );
 }

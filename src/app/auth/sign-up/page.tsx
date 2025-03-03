@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/lib/hooks/useSupabaseAuth";
 import {
   EnvelopeIcon,
   LockClosedIcon,
@@ -12,25 +12,13 @@ import {
 
 export default function SignUp() {
   const router = useRouter();
-  const { signInWithGoogle, signUpWithEmail } = useAuth();
+  const { signUpWithEmail } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const handleGoogleSignIn = async () => {
-    try {
-      setIsLoading(true);
-      setError("");
-      await signInWithGoogle();
-      router.push("/dashboard");
-    } catch (error: any) {
-      setError(error.message || "Failed to sign in with Google");
-      setIsLoading(false);
-    }
-  };
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,34 +201,6 @@ export default function SignUp() {
               </button>
             </div>
           </form>
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <button
-                onClick={handleGoogleSignIn}
-                disabled={isLoading}
-                className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                <img
-                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                  alt="Google logo"
-                  className="w-5 h-5 mr-2"
-                />
-                Sign up with Google
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

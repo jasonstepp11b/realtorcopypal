@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/hooks/useSupabaseAuth";
 import { useTheme } from "@/lib/contexts/ThemeContext";
 
 export default function Navigation() {
   const pathname = usePathname();
-  const { user, signInWithGoogle, signOut } = useAuth();
+  const router = useRouter();
+  const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
+
+  const handleSignIn = () => {
+    router.push("/auth/sign-in");
+  };
 
   return (
     <nav className="bg-white shadow-sm dark:bg-gray-800">
@@ -121,7 +126,7 @@ export default function Navigation() {
             {user ? (
               <div className="flex items-center space-x-4">
                 <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {user.displayName || user.email}
+                  {user.email}
                 </span>
                 <button
                   onClick={signOut}
@@ -132,7 +137,7 @@ export default function Navigation() {
               </div>
             ) : (
               <button
-                onClick={signInWithGoogle}
+                onClick={handleSignIn}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
               >
                 Sign In

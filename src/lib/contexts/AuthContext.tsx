@@ -52,40 +52,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // If auth is null (Firebase not configured), we don't need to set up the listener
-    if (!auth) {
-      setLoading(false);
-      return () => {};
-    }
+    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+      setUser(user);
 
-    const unsubscribe = onAuthStateChanged(
-      auth as Auth,
-      async (user: User | null) => {
-        setUser(user);
+      // Set or remove auth cookie for middleware
+      if (user) {
+        // Set a cookie that expires in 7 days
+        Cookies.set("auth_token", "true", { expires: 7, sameSite: "strict" });
 
-        // Set or remove auth cookie for middleware
-        if (user) {
-          // Set a cookie that expires in 7 days
-          Cookies.set("auth_token", "true", { expires: 7, sameSite: "strict" });
+        // Track sign-in event
+        trackEvent("user_signed_in", { method: "session_restored" });
 
-          // Track sign-in event
-          trackEvent("user_signed_in", { method: "session_restored" });
-
-          try {
-            const profile = await getUserProfile(user.uid);
-            setUserProfile(profile);
-          } catch (error) {
-            console.error("Error fetching user profile:", error);
-          }
-        } else {
-          // Remove the auth cookie
-          Cookies.remove("auth_token");
-          setUserProfile(null);
+        try {
+          const profile = await getUserProfile(user.uid);
+          setUserProfile(profile);
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
         }
-
-        setLoading(false);
+      } else {
+        // Remove the auth cookie
+        Cookies.remove("auth_token");
+        setUserProfile(null);
       }
-    );
+
+      setLoading(false);
+    });
 
     return () => unsubscribe();
   }, []);
