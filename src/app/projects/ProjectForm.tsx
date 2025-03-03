@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { PropertyProject } from "./page";
+import { PropertyProject } from "@/lib/supabase/supabaseUtils";
 
 interface ProjectFormProps {
   project?: Partial<PropertyProject>;
