@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useSupabaseAuth";
 import { getGenerations, deleteGeneration } from "@/lib/supabase/supabaseUtils";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ChartBarIcon,
   DocumentTextIcon,
@@ -322,11 +323,12 @@ export default function Dashboard() {
                     >
                       {/* Property Image */}
                       {project.image_url && (
-                        <div className="mb-3 w-full h-32 overflow-hidden rounded-md">
-                          <img
+                        <div className="mb-3 w-full h-32 overflow-hidden rounded-md relative">
+                          <Image
                             src={project.image_url}
                             alt={project.name}
-                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                            fill
+                            className="object-cover hover:scale-105 transition-transform duration-300"
                           />
                         </div>
                       )}

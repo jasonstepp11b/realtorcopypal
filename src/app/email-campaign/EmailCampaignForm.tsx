@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Tab } from "@headlessui/react";
 import {
   EnvelopeIcon,
@@ -95,12 +95,14 @@ interface EmailCampaignFormProps {
   };
   onSubmit: (data: any) => void;
   isGenerating: boolean;
+  emailType: "broadcast" | "follow-up" | "transactional";
 }
 
 export default function EmailCampaignForm({
   formData,
   onSubmit,
   isGenerating,
+  emailType,
 }: EmailCampaignFormProps) {
   const [localFormData, setLocalFormData] = useState(formData);
   const [selectedTabIndex, setSelectedTabIndex] = useState(0);
@@ -108,10 +110,9 @@ export default function EmailCampaignForm({
   const [isOtherTone, setIsOtherTone] = useState(false);
   const [isOtherTransactionType, setIsOtherTransactionType] = useState(false);
 
-  // Check for initial values that might be "Other"
-  useEffect(() => {
-    // Check if broadcastPurpose is not in the standard options
-    const standardBroadcastPurposes = [
+  // Define standard options using useMemo
+  const standardBroadcastPurposes = useMemo(
+    () => [
       "new-listing",
       "open-house",
       "just-sold",
@@ -121,8 +122,31 @@ export default function EmailCampaignForm({
       "home-tips",
       "client-event",
       "holiday",
-    ];
+    ],
+    []
+  );
 
+  const standardTones = useMemo(
+    () => [
+      "professional",
+      "friendly",
+      "formal",
+      "urgent",
+      "informative",
+      "luxurious",
+      "personal",
+    ],
+    []
+  );
+
+  const standardTransactionTypes = useMemo(
+    () => ["welcome", "open-house", "listing-alert", "appointment"],
+    []
+  );
+
+  // Check for initial values that might be "Other"
+  useEffect(() => {
+    // Check if broadcastPurpose is not in the standard options
     if (
       formData.broadcastPurpose &&
       !standardBroadcastPurposes.includes(formData.broadcastPurpose)
@@ -135,16 +159,6 @@ export default function EmailCampaignForm({
     }
 
     // Check if tone is not in the standard options
-    const standardTones = [
-      "professional",
-      "friendly",
-      "formal",
-      "urgent",
-      "informative",
-      "luxurious",
-      "personal",
-    ];
-
     if (formData.tone && !standardTones.includes(formData.tone)) {
       setIsOtherTone(true);
       setLocalFormData((prev) => ({
@@ -154,13 +168,6 @@ export default function EmailCampaignForm({
     }
 
     // Check if transactionType is not in the standard options
-    const standardTransactionTypes = [
-      "welcome",
-      "open-house",
-      "listing-alert",
-      "appointment",
-    ];
-
     if (
       formData.transactionType &&
       !standardTransactionTypes.includes(formData.transactionType)
@@ -171,20 +178,20 @@ export default function EmailCampaignForm({
         customTransactionType: formData.transactionType,
       }));
     }
-  }, [formData]);
+  }, [
+    formData,
+    standardBroadcastPurposes,
+    standardTones,
+    standardTransactionTypes,
+  ]);
 
   // Update local form data when emailType changes
   useEffect(() => {
     setLocalFormData((prev) => ({
       ...prev,
-      emailType:
-        selectedTabIndex === 0
-          ? "broadcast"
-          : selectedTabIndex === 1
-          ? "follow-up"
-          : "transactional",
+      emailType,
     }));
-  }, [selectedTabIndex]);
+  }, [emailType]);
 
   const handleInputChange = (
     e: React.ChangeEvent<

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, useRef, useEffect } from "react";
+import { useState, FormEvent, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 
 interface SocialMediaFormProps {
@@ -54,87 +54,87 @@ export default function SocialMediaForm({
   const [isOtherTone, setIsOtherTone] = useState(false);
   const [isOtherCallToAction, setIsOtherCallToAction] = useState(false);
 
-  const propertyTypes = [
-    "Single-family home",
-    "Condo",
-    "Townhouse",
-    "Multi-family home",
-    "Apartment",
-    "Luxury home",
-    "Vacation home",
-    "Ranch",
-    "Land",
-    "Other",
-  ];
+  const propertyTypes = useMemo(
+    () => [
+      "Single Family Home",
+      "Condo",
+      "Townhouse",
+      "Multi-Family",
+      "Luxury Home",
+      "Vacation Home",
+      "Investment Property",
+      "Land",
+      "Other",
+    ],
+    []
+  );
 
-  const platforms = [
-    "Instagram",
-    "Facebook",
-    "Twitter",
-    "LinkedIn",
-    "Pinterest",
-    "Other",
-  ];
+  const platforms = useMemo(
+    () => ["Facebook", "Instagram", "Twitter", "LinkedIn", "Other"],
+    []
+  );
 
-  const callToActions = [
-    "Schedule a tour",
-    "DM for details",
-    "Visit our website",
-    "Call now",
-    "Book an appointment",
-    "Join the open house",
-    "Other",
-  ];
+  const callToActions = useMemo(
+    () => [
+      "Schedule a showing",
+      "Contact us",
+      "Learn more",
+      "Visit our website",
+      "Call now",
+      "Message us",
+      "Other",
+    ],
+    []
+  );
 
-  const tones = [
-    "Professional",
-    "Casual",
-    "Luxury",
-    "Friendly",
-    "Enthusiastic",
-    "Informative",
-    "Other",
-  ];
+  const tones = useMemo(
+    () => [
+      "Professional",
+      "Friendly",
+      "Luxurious",
+      "Informative",
+      "Enthusiastic",
+      "Other",
+    ],
+    []
+  );
 
   // Check for initial values that might be "Other"
   useEffect(() => {
-    if (formData.platform && !platforms.includes(formData.platform)) {
-      setIsOtherPlatform(true);
-      setLocalFormData((prev) => ({
-        ...prev,
-        customPlatform: formData.platform,
-        platform: "Other",
-      }));
-    }
+    setIsOtherPropertyType(
+      !propertyTypes.includes(localFormData.propertyType) &&
+        localFormData.propertyType !== ""
+    );
+    setIsOtherPlatform(
+      !platforms.includes(localFormData.platform) &&
+        localFormData.platform !== ""
+    );
+    setIsOtherTone(
+      !tones.includes(localFormData.tone) && localFormData.tone !== ""
+    );
+    setIsOtherCallToAction(
+      !callToActions.includes(localFormData.callToAction) &&
+        localFormData.callToAction !== ""
+    );
+  }, [
+    localFormData.propertyType,
+    localFormData.platform,
+    localFormData.tone,
+    localFormData.callToAction,
+    propertyTypes,
+    platforms,
+    tones,
+    callToActions,
+  ]);
 
-    if (formData.tone && !tones.includes(formData.tone)) {
-      setIsOtherTone(true);
-      setLocalFormData((prev) => ({
-        ...prev,
-        customTone: formData.tone,
-        tone: "Other",
-      }));
+  // Handle image preview
+  useEffect(() => {
+    if (localFormData.primaryPhoto) {
+      setImagePreview(localFormData.primaryPhoto);
+    } else {
+      setImagePreview(null);
     }
-
-    if (
-      formData.callToAction &&
-      !callToActions.includes(formData.callToAction)
-    ) {
-      setIsOtherCallToAction(true);
-      setLocalFormData((prev) => ({
-        ...prev,
-        customCallToAction: formData.callToAction,
-        callToAction: "Other",
-      }));
-    }
-
-    if (
-      formData.propertyType &&
-      !propertyTypes.includes(formData.propertyType)
-    ) {
-      setIsOtherPropertyType(true);
-    }
-  }, [formData, platforms, tones, callToActions, propertyTypes]);
+  }, [localFormData.primaryPhoto]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -270,11 +270,11 @@ export default function SocialMediaForm({
     onSubmit(submissionData);
   };
 
-  // Determine if we should show platform-specific fields
-  const showHashtags =
-    localFormData.platform === "Instagram" ||
-    localFormData.platform === "Twitter" ||
-    localFormData.platform === "Pinterest";
+  // Show hashtags for platforms that commonly use them
+  const showHashtags = useMemo(() => {
+    const hashtagPlatforms = ["Instagram", "Twitter", "LinkedIn"];
+    return hashtagPlatforms.includes(localFormData.platform);
+  }, [localFormData.platform]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -425,10 +425,11 @@ export default function SocialMediaForm({
             </div>
             {imagePreview && (
               <div className="mt-2 relative h-40 w-full md:w-1/2 border border-gray-300 rounded-md overflow-hidden">
-                <img
+                <Image
                   src={imagePreview}
                   alt="Property preview"
-                  className="h-full w-full object-cover"
+                  fill
+                  className="object-cover"
                 />
                 <button
                   type="button"
@@ -440,7 +441,7 @@ export default function SocialMediaForm({
                     }));
                     if (fileInputRef.current) fileInputRef.current.value = "";
                   }}
-                  className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"
+                  className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full z-10"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"

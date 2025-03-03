@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 
 interface LoadingOverlayProps {
@@ -18,54 +18,60 @@ export default function LoadingOverlay({
   const [tipIndex, setTipIndex] = useState(0);
 
   // Loading steps messages based on generator type
-  const loadingSteps = {
-    "property-listing": [
-      "Analyzing property details...",
-      "Identifying key selling points...",
-      "Crafting compelling descriptions...",
-      "Optimizing for your target audience...",
-      "Finalizing your property listings...",
-    ],
-    "social-media": [
-      "Analyzing your real estate content...",
-      "Crafting engaging social posts...",
-      "Optimizing for platform visibility...",
-      "Adding relevant hashtags...",
-      "Finalizing your social media content...",
-    ],
-    "email-campaign": [
-      "Analyzing your campaign goals...",
-      "Crafting compelling email content...",
-      "Optimizing subject lines...",
-      "Personalizing for your audience...",
-      "Finalizing your email campaign...",
-    ],
-  };
+  const loadingSteps = useMemo(
+    () => ({
+      "property-listing": [
+        "Analyzing property details...",
+        "Identifying key selling points...",
+        "Crafting compelling descriptions...",
+        "Optimizing for your target audience...",
+        "Finalizing your property listings...",
+      ],
+      "social-media": [
+        "Analyzing your real estate content...",
+        "Crafting engaging social posts...",
+        "Optimizing for platform visibility...",
+        "Adding relevant hashtags...",
+        "Finalizing your social media content...",
+      ],
+      "email-campaign": [
+        "Analyzing your campaign goals...",
+        "Crafting compelling email content...",
+        "Optimizing subject lines...",
+        "Personalizing for your audience...",
+        "Finalizing your email campaign...",
+      ],
+    }),
+    []
+  );
 
   // Tips based on generator type
-  const tips = {
-    "property-listing": [
-      "High-quality photos can increase engagement by up to 94%",
-      "Highlighting neighborhood amenities can attract more qualified buyers",
-      "Virtual tours can increase interest in your property by 87%",
-      "Properties with detailed descriptions sell 20% faster",
-      "Mentioning energy-efficient features appeals to eco-conscious buyers",
-    ],
-    "social-media": [
-      "Posts with images get 2.3x more engagement than those without",
-      "The best times to post real estate content are Tuesdays and Thursdays",
-      "Using 3-5 relevant hashtags can increase reach by 40%",
-      "Video tours get 403% more inquiries than listings without videos",
-      "Sharing client testimonials builds trust with potential clients",
-    ],
-    "email-campaign": [
-      "Personalized subject lines increase open rates by 26%",
-      "The best time to send real estate emails is Tuesday at 10 AM",
-      "Including a clear call-to-action increases click-through rates by 371%",
-      "Segmenting your email list can improve conversion rates by 760%",
-      "Mobile-optimized emails are crucial as 61% of emails are opened on mobile",
-    ],
-  };
+  const tips = useMemo(
+    () => ({
+      "property-listing": [
+        "High-quality photos can increase engagement by up to 94%",
+        "Highlighting neighborhood amenities can attract more qualified buyers",
+        "Virtual tours can increase interest in your property by 87%",
+        "Properties with detailed descriptions sell 20% faster",
+        "Mentioning energy-efficient features appeals to eco-conscious buyers",
+      ],
+      "social-media": [
+        "Posts with images get 2.3x more engagement than those without",
+        "The best times to post real estate content are Tuesdays and Thursdays",
+        "Using 3-5 relevant hashtags can increase reach by 40%",
+        "Video tours get 403% more inquiries than listings without videos",
+        "Sharing client testimonials builds trust with potential clients",
+      ],
+      "email-campaign": [
+        "Personalized subject lines increase open rates by 26%",
+        "The best time to send real estate emails is Tuesday at 10 AM",
+        "Including a clear call-to-action increases click-through rates by 371%",
+        "Segmenting your email list can improve conversion rates by 760%",
+        "Mobile-optimized emails are crucial as 61% of emails are opened on mobile",
+      ],
+    }),
+    []
+  );
 
   // Cycle through loading steps
   useEffect(() => {
@@ -78,7 +84,7 @@ export default function LoadingOverlay({
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isLoading, generatorType]);
+  }, [isLoading, generatorType, loadingSteps]);
 
   // Cycle through tips
   useEffect(() => {
@@ -89,7 +95,7 @@ export default function LoadingOverlay({
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isLoading, generatorType]);
+  }, [isLoading, generatorType, tips]);
 
   if (!isLoading) return null;
 

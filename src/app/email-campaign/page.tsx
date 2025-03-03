@@ -6,128 +6,121 @@ import EmailCampaignForm from "@/app/email-campaign/EmailCampaignForm";
 import EmailCampaignResults from "@/app/email-campaign/EmailCampaignResults";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { Tab } from "@headlessui/react";
-import { getProject } from "@/lib/supabase/supabaseUtils";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+const defaultFormData = {
+  // Common fields
+  emailType: "broadcast" as "broadcast" | "follow-up" | "transactional",
+  subject: "",
+  targetAudience: "",
+  tone: "professional",
+  customTone: "",
+
+  // Broadcast email specific
+  broadcastPurpose: "new-listing",
+  customBroadcastPurpose: "",
+  newsletterTopic: "",
+  promotionDetails: "",
+  eventDetails: "",
+  marketUpdateInfo: "",
+
+  // New realtor-specific fields for broadcast emails
+  propertyAddress: "",
+  propertyPrice: "",
+  propertyType: "",
+  propertyHighlights: "",
+  openHouseDate: "",
+  openHouseTime: "",
+  specialInstructions: "",
+  salePrice: "",
+  daysOnMarket: "",
+  saleHighlights: "",
+  previousPrice: "",
+  newPrice: "",
+  neighborhoodName: "",
+  neighborhoodHighlights: "",
+  season: "",
+  tipsTopic: "",
+  tipsContent: "",
+  eventName: "",
+  eventDate: "",
+  eventTime: "",
+  eventLocation: "",
+  holidayOccasion: "",
+  holidayMessage: "",
+
+  // Follow-up series specific
+  followUpSequenceType: "market-report",
+  customSequenceType: "",
+  numberOfEmails: "3",
+  emailFrequency: "3-5-7",
+  customEmailFrequency: "",
+  sequenceGoals: "",
+  valueProposition: "",
+
+  // Legacy follow-up fields
+  followUpSequence: "initial" as "initial" | "second" | "final",
+  initialContactContext: "",
+  daysSinceLastContact: "",
+  previousInteractionSummary: "",
+
+  // Transactional email specific
+  transactionType: "welcome" as
+    | "welcome"
+    | "open-house"
+    | "listing-alert"
+    | "appointment"
+    | "other",
+  customTransactionType: "",
+  userName: "",
+  propertyDetails: "",
+  appointmentDetails: "",
+  openHouseDetails: "",
+
+  // Common customization
+  callToAction: "",
+  companyInfo: "",
+  agentName: "",
+  agentTitle: "",
+  includeTestimonial: false,
+  testimonialText: "",
+};
 
 export default function EmailCampaignPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const projectId = searchParams?.get("projectId");
-
   const [step, setStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isLoadingProject, setIsLoadingProject] = useState(!!projectId);
+  const [isLoadingProject, setIsLoadingProject] = useState(false);
   const [results, setResults] = useState<string[]>([]);
   const [emailType, setEmailType] = useState<
     "broadcast" | "follow-up" | "transactional"
   >("broadcast");
-  const [formData, setFormData] = useState({
-    // Common fields
-    emailType: "broadcast" as "broadcast" | "follow-up" | "transactional",
-    subject: "",
-    targetAudience: "",
-    tone: "professional",
-    customTone: "",
-
-    // Broadcast email specific
-    broadcastPurpose: "new-listing",
-    customBroadcastPurpose: "",
-    newsletterTopic: "",
-    promotionDetails: "",
-    eventDetails: "",
-    marketUpdateInfo: "",
-
-    // New realtor-specific fields for broadcast emails
-    propertyAddress: "",
-    propertyPrice: "",
-    propertyType: "",
-    propertyHighlights: "",
-    openHouseDate: "",
-    openHouseTime: "",
-    specialInstructions: "",
-    salePrice: "",
-    daysOnMarket: "",
-    saleHighlights: "",
-    previousPrice: "",
-    newPrice: "",
-    neighborhoodName: "",
-    neighborhoodHighlights: "",
-    season: "",
-    tipsTopic: "",
-    tipsContent: "",
-    eventName: "",
-    eventDate: "",
-    eventTime: "",
-    eventLocation: "",
-    holidayOccasion: "",
-    holidayMessage: "",
-
-    // Follow-up series specific (updated for sequence approach)
-    followUpSequenceType: "market-report",
-    customSequenceType: "",
-    numberOfEmails: "3",
-    emailFrequency: "3-5-7",
-    customEmailFrequency: "",
-    initialContactContext: "",
-    sequenceGoals: "",
-    valueProposition: "",
-
-    // Legacy follow-up fields (kept for backward compatibility)
-    followUpSequence: "initial" as "initial" | "second" | "final",
-    daysSinceLastContact: "",
-    followUpStage: "initial-inquiry",
-    customFollowUpStage: "",
-    daysSinceContact: "3",
-    previousInteractionSummary: "",
-    nextSteps: "",
-
-    // Transactional email specific
-    transactionType: "offer-accepted",
-    customTransactionType: "",
-    clientName: "",
-    userName: "",
-    propertyDetails: "",
-    transactionDetails: "",
-    deadlineDate: "",
-    requiredAction: "",
-    appointmentDetails: "",
-    openHouseDetails: "",
-
-    // Common customization
-    callToAction: "",
-    companyInfo: "",
-    agentName: "",
-    agentTitle: "",
-    includeTestimonial: false,
-    testimonialText: "",
-  });
-
-  // Load project data if projectId is provided
-  useEffect(() => {
-    if (projectId) {
-      loadProjectData(projectId);
-    }
-  }, [projectId]);
+  const [formData, setFormData] =
+    useState<typeof defaultFormData>(defaultFormData);
 
   const loadProjectData = async (id: string) => {
     try {
       setIsLoadingProject(true);
-      const project = await getProject(id);
+      const { data: project } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("id", id)
+        .single();
 
       if (project) {
-        setFormData({
-          ...formData,
-          propertyAddress: project.address || "",
-          propertyPrice: project.listing_price || "",
-          propertyType: project.property_type || "",
-          propertyHighlights: project.features || "",
-          neighborhoodHighlights: project.neighborhood_highlights || "",
-          targetAudience: project.target_buyer || "",
-          propertyDetails: `${project.bedrooms || ""} bed, ${
-            project.bathrooms || ""
-          } bath, ${project.square_feet || ""} sq ft ${
-            project.property_type || ""
-          } at ${project.address || ""}`,
-        });
+        setFormData((prev) => ({
+          ...prev,
+          propertyAddress: project.propertyAddress || "",
+          propertyType: project.propertyType || "",
+          propertyPrice: project.listingPrice || "",
+          propertyHighlights: project.keyFeatures || "",
+        }));
       }
     } catch (error) {
       console.error("Error loading project data:", error);
@@ -135,6 +128,13 @@ export default function EmailCampaignPage() {
       setIsLoadingProject(false);
     }
   };
+
+  useEffect(() => {
+    const projectId = searchParams?.get("projectId");
+    if (projectId) {
+      loadProjectData(projectId);
+    }
+  }, [searchParams]);
 
   const handleFormSubmit = async (data: typeof formData) => {
     setFormData(data);

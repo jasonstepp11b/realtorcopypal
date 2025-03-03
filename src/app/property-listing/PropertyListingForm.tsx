@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, useEffect, useRef } from "react";
+import { useState, FormEvent, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
 
 interface PropertyListingFormProps {
@@ -37,32 +37,41 @@ export default function PropertyListingForm({
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Common property types for the dropdown
-  const propertyTypes = [
-    "Single-family home",
-    "Condo",
-    "Townhouse",
-    "Multi-family home",
-    "Apartment",
-    "Luxury home",
-    "Vacation home",
-    "Ranch",
-    "Tiny home",
-    "Mobile home",
-    "Penthouse",
-    "Loft",
-    "Other",
-  ];
+  // Property type options
+  const propertyTypes = useMemo(
+    () => [
+      "Single-family home",
+      "Condo",
+      "Townhouse",
+      "Multi-family home",
+      "Apartment",
+      "Luxury home",
+      "Vacation home",
+      "Ranch",
+      "Land",
+      "Commercial",
+      "Industrial",
+      "Tiny home",
+      "Mobile home",
+      "Penthouse",
+      "Loft",
+      "Other",
+    ],
+    []
+  );
 
   // Tone options
-  const toneOptions = [
-    "professional",
-    "friendly",
-    "luxury",
-    "urgent",
-    "enthusiastic",
-    "Other",
-  ];
+  const toneOptions = useMemo(
+    () => [
+      "professional",
+      "friendly",
+      "luxury",
+      "urgent",
+      "enthusiastic",
+      "Other",
+    ],
+    []
+  );
 
   // Check if the initial property type and tone are not in our lists
   useEffect(() => {
@@ -279,10 +288,11 @@ export default function PropertyListingForm({
           </div>
           {imagePreview && (
             <div className="mt-3 relative w-full h-40">
-              <img
+              <Image
                 src={imagePreview}
                 alt="Property preview"
-                className="rounded-md object-cover w-full h-full"
+                fill
+                className="rounded-md object-cover"
               />
             </div>
           )}

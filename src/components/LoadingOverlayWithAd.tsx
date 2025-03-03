@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 
 interface LoadingOverlayWithAdProps {
@@ -18,101 +18,112 @@ export default function LoadingOverlayWithAd({
   const [tipIndex, setTipIndex] = useState(0);
 
   // Loading steps messages based on generator type
-  const loadingSteps = {
-    "property-listing": [
-      "Analyzing property details...",
-      "Identifying key selling points...",
-      "Crafting compelling descriptions...",
-      "Optimizing for your target audience...",
-      "Finalizing your property listings...",
-    ],
-    "social-media": [
-      "Analyzing your real estate content...",
-      "Crafting engaging social posts...",
-      "Optimizing for platform visibility...",
-      "Adding relevant hashtags...",
-      "Finalizing your social media content...",
-    ],
-    "email-campaign": [
-      "Analyzing your campaign goals...",
-      "Crafting compelling email content...",
-      "Optimizing subject lines...",
-      "Personalizing for your audience...",
-      "Finalizing your email campaign...",
-    ],
-  };
+  const loadingSteps = useMemo(
+    () => ({
+      "property-listing": [
+        "Analyzing property details...",
+        "Identifying key selling points...",
+        "Crafting compelling descriptions...",
+        "Optimizing for your target audience...",
+        "Finalizing your property listings...",
+      ],
+      "social-media": [
+        "Analyzing your real estate content...",
+        "Crafting engaging social posts...",
+        "Optimizing for platform visibility...",
+        "Adding relevant hashtags...",
+        "Finalizing your social media content...",
+      ],
+      "email-campaign": [
+        "Analyzing your campaign goals...",
+        "Crafting compelling email content...",
+        "Optimizing subject lines...",
+        "Personalizing for your audience...",
+        "Finalizing your email campaign...",
+      ],
+    }),
+    []
+  );
 
   // Tips based on generator type
-  const tips = {
-    "property-listing": [
-      "High-quality photos can increase engagement by up to 94%",
-      "Highlighting neighborhood amenities can attract more qualified buyers",
-      "Virtual tours can increase interest in your property by 87%",
-      "Properties with detailed descriptions sell 20% faster",
-      "Mentioning energy-efficient features appeals to eco-conscious buyers",
-    ],
-    "social-media": [
-      "Posts with images get 2.3x more engagement than those without",
-      "The best times to post real estate content are Tuesdays and Thursdays",
-      "Using 3-5 relevant hashtags can increase reach by 40%",
-      "Video tours get 403% more inquiries than listings without videos",
-      "Sharing client testimonials builds trust with potential clients",
-    ],
-    "email-campaign": [
-      "Personalized subject lines increase open rates by 26%",
-      "The best time to send real estate emails is Tuesday at 10 AM",
-      "Including a clear call-to-action increases click-through rates by 371%",
-      "Segmenting your email list can improve conversion rates by 760%",
-      "Mobile-optimized emails are crucial as 61% of emails are opened on mobile",
-    ],
-  };
+  const tips = useMemo(
+    () => ({
+      "property-listing": [
+        "High-quality photos can increase engagement by up to 94%",
+        "Highlighting neighborhood amenities can attract more qualified buyers",
+        "Virtual tours can increase interest in your property by 87%",
+        "Properties with detailed descriptions sell 20% faster",
+        "Mentioning energy-efficient features appeals to eco-conscious buyers",
+      ],
+      "social-media": [
+        "Posts with images get 2.3x more engagement than those without",
+        "The best times to post real estate content are Tuesdays and Thursdays",
+        "Using 3-5 relevant hashtags can increase reach by 40%",
+        "Video tours get 403% more inquiries than listings without videos",
+        "Sharing client testimonials builds trust with potential clients",
+      ],
+      "email-campaign": [
+        "Personalized subject lines increase open rates by 26%",
+        "The best time to send real estate emails is Tuesday at 10 AM",
+        "Including a clear call-to-action increases click-through rates by 371%",
+        "Segmenting your email list can improve conversion rates by 760%",
+        "Mobile-optimized emails are crucial as 61% of emails are opened on mobile",
+      ],
+    }),
+    []
+  );
 
   // Sample ads for different generator types
-  const ads = {
-    "property-listing": [
-      {
-        title: "Upgrade to RealtorCopyPal Pro",
-        description: "Get unlimited property listings and premium templates",
-        cta: "Try Pro Free",
-        image: "/images/pro-badge.png", // This would need to be created
-      },
-      {
-        title: "Professional Photography",
-        description:
-          "Boost your listings with professional real estate photography",
-        cta: "Learn More",
-        image: "/images/camera.png", // This would need to be created
-      },
-    ],
-    "social-media": [
-      {
-        title: "Social Media Management",
-        description: "Let us handle your real estate social media presence",
-        cta: "Get Started",
-        image: "/images/social-media.png", // This would need to be created
-      },
-      {
-        title: "RealtorCopyPal Pro",
-        description: "Schedule and automate your social media posts",
-        cta: "Try Pro Free",
-        image: "/images/pro-badge.png", // This would need to be created
-      },
-    ],
-    "email-campaign": [
-      {
-        title: "Email Marketing Suite",
-        description: "Track opens, clicks, and conversions with our pro tools",
-        cta: "Upgrade Now",
-        image: "/images/email-marketing.png", // This would need to be created
-      },
-      {
-        title: "RealtorCopyPal Pro",
-        description: "Create unlimited email campaigns with premium templates",
-        cta: "Try Pro Free",
-        image: "/images/pro-badge.png", // This would need to be created
-      },
-    ],
-  };
+  const ads = useMemo(
+    () => ({
+      "property-listing": [
+        {
+          title: "Upgrade to RealtorCopyPal Pro",
+          description: "Get unlimited property listings and premium templates",
+          cta: "Try Pro Free",
+          image: "/images/pro-badge.png",
+        },
+        {
+          title: "Professional Photography",
+          description:
+            "Boost your listings with professional real estate photography",
+          cta: "Learn More",
+          image: "/images/camera.png",
+        },
+      ],
+      "social-media": [
+        {
+          title: "Social Media Management",
+          description: "Let us handle your real estate social media presence",
+          cta: "Get Started",
+          image: "/images/social-media.png",
+        },
+        {
+          title: "RealtorCopyPal Pro",
+          description: "Schedule and automate your social media posts",
+          cta: "Try Pro Free",
+          image: "/images/pro-badge.png",
+        },
+      ],
+      "email-campaign": [
+        {
+          title: "Email Marketing Suite",
+          description:
+            "Track opens, clicks, and conversions with our pro tools",
+          cta: "Upgrade Now",
+          image: "/images/email-marketing.png",
+        },
+        {
+          title: "RealtorCopyPal Pro",
+          description:
+            "Create unlimited email campaigns with premium templates",
+          cta: "Try Pro Free",
+          image: "/images/pro-badge.png",
+        },
+      ],
+    }),
+    []
+  );
 
   // Cycle through loading steps
   useEffect(() => {
@@ -125,7 +136,7 @@ export default function LoadingOverlayWithAd({
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isLoading, generatorType]);
+  }, [isLoading, generatorType, loadingSteps]);
 
   // Cycle through tips
   useEffect(() => {
@@ -136,7 +147,7 @@ export default function LoadingOverlayWithAd({
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isLoading, generatorType]);
+  }, [isLoading, generatorType, tips]);
 
   if (!isLoading) return null;
 

@@ -110,10 +110,12 @@ export default function StorageTest() {
 
             {fileType?.startsWith("image/") ? (
               <div className="border border-gray-200 rounded p-2">
-                <img
+                <Image
                   src={uploadUrl}
                   alt="Uploaded image"
-                  className="max-w-full h-auto max-h-64 rounded mx-auto"
+                  width={400}
+                  height={300}
+                  className="max-w-full h-auto max-h-64 rounded mx-auto object-contain"
                 />
               </div>
             ) : fileType?.startsWith("video/") ? (

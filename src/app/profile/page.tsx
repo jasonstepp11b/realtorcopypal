@@ -12,6 +12,7 @@ import {
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Profile() {
   const router = useRouter();
@@ -95,11 +96,14 @@ export default function Profile() {
           <div className="flex flex-col md:flex-row md:items-center">
             <div className="flex-shrink-0 mb-4 md:mb-0 md:mr-6">
               {user.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName || "User"}
-                  className="h-24 w-24 rounded-full"
-                />
+                <div className="relative h-24 w-24">
+                  <Image
+                    src={user.photoURL}
+                    alt={user.displayName || "User"}
+                    fill
+                    className="rounded-full object-cover"
+                  />
+                </div>
               ) : (
                 <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center">
                   <UserCircleIcon className="h-16 w-16 text-gray-400" />
