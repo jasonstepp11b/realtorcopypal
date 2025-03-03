@@ -3,9 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useSupabaseAuth";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import ProjectForm from "../../ProjectForm";
-import { getProject, updateProject } from "@/lib/supabase/supabaseUtils";
-import { PropertyProject } from "../../page";
+import {
+  getProject,
+  updateProject,
+  PropertyProject,
+} from "@/lib/supabase/supabaseUtils";
 
 interface EditProjectPageProps {
   params: {
