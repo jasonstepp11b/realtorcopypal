@@ -127,6 +127,10 @@ This project can be easily deployed to Vercel:
 3. Add your environment variables in the Vercel dashboard
 4. Deploy!
 
+## Deployment Update
+
+Updated: ${new Date().toISOString()}
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
