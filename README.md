@@ -129,7 +129,7 @@ This project can be easily deployed to Vercel:
 
 ## Deployment Update
 
-Updated: ${new Date().toISOString()} - Redeploying with fixed environment variables
+Updated: ${new Date().toISOString()} - Redeploying with Firebase configuration
 
 ## License
 

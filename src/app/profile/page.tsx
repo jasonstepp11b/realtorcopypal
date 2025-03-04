@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/hooks/useAuth";
-import { updateUserProfile } from "@/lib/firebase/firebaseUtils";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import {
   UserCircleIcon,
   EnvelopeIcon,
@@ -16,7 +15,10 @@ import Image from "next/image";
 
 export default function Profile() {
   const router = useRouter();
-  const { user, userProfile, loading, signOut } = useAuth();
+  const supabase = createClientComponentClient();
+  const [user, setUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -24,14 +26,40 @@ export default function Profile() {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/auth/sign-in");
+    async function getUser() {
+      setLoading(true);
+
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+
+      if (error || !session) {
+        router.push("/auth/sign-in");
+        return;
+      }
+
+      setUser(session.user);
+
+      // Fetch user profile from profiles table
+      if (session.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+
+        if (!profileError && profile) {
+          setUserProfile(profile);
+          setDisplayName(profile.full_name || "");
+        }
+      }
+
+      setLoading(false);
     }
 
-    if (user) {
-      setDisplayName(user.displayName || "");
-    }
-  }, [user, loading, router]);
+    getUser();
+  }, [router, supabase]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,17 +71,32 @@ export default function Profile() {
       setError("");
       setSuccess("");
 
-      await updateUserProfile(user.uid, {
-        displayName,
-      });
+      // Update profile in Supabase
+      const { error } = await supabase
+        .from("profiles")
+        .update({ full_name: displayName })
+        .eq("id", user.id);
+
+      if (error) throw error;
 
       setSuccess("Profile updated successfully");
       setIsEditing(false);
+
+      // Update local state
+      setUserProfile({
+        ...userProfile,
+        full_name: displayName,
+      });
     } catch (error: any) {
       setError(error.message || "Failed to update profile");
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
   };
 
   if (loading) {
@@ -95,11 +138,11 @@ export default function Profile() {
         <div className="px-4 py-5 sm:p-6">
           <div className="flex flex-col md:flex-row md:items-center">
             <div className="flex-shrink-0 mb-4 md:mb-0 md:mr-6">
-              {user.photoURL ? (
+              {userProfile?.avatar_url ? (
                 <div className="relative h-24 w-24">
                   <Image
-                    src={user.photoURL}
-                    alt={user.displayName || "User"}
+                    src={userProfile.avatar_url}
+                    alt={userProfile.full_name || "User"}
                     fill
                     className="rounded-full object-cover"
                   />
@@ -139,7 +182,7 @@ export default function Profile() {
                     type="button"
                     onClick={() => {
                       setIsEditing(false);
-                      setDisplayName(user.displayName || "");
+                      setDisplayName(userProfile?.full_name || "");
                     }}
                     className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
@@ -157,7 +200,7 @@ export default function Profile() {
             ) : (
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-gray-900">
-                  {user.displayName || "User"}
+                  {userProfile?.full_name || "User"}
                 </h2>
                 <p className="text-sm text-gray-500 flex items-center mt-1">
                   <EnvelopeIcon className="h-4 w-4 mr-1" />
@@ -187,7 +230,7 @@ export default function Profile() {
                   Account Type
                 </dt>
                 <dd className="mt-1 text-sm text-gray-900">
-                  {user.providerData[0]?.providerId === "google.com"
+                  {user.app_metadata?.provider === "google"
                     ? "Google Account"
                     : "Email & Password"}
                 </dd>
@@ -196,10 +239,10 @@ export default function Profile() {
               <div className="sm:col-span-1">
                 <dt className="text-sm font-medium text-gray-500 flex items-center">
                   <ArrowPathIcon className="h-5 w-5 mr-1 text-gray-400" />
-                  Generations Used
+                  Account Created
                 </dt>
                 <dd className="mt-1 text-sm text-gray-900">
-                  {userProfile?.generationCount || 0} generations
+                  {new Date(user.created_at).toLocaleDateString()}
                 </dd>
               </div>
 
@@ -211,19 +254,9 @@ export default function Profile() {
                 <dd className="mt-1 text-sm text-gray-900">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-medium">
-                        {userProfile?.subscription?.plan === "free"
-                          ? "Free Plan"
-                          : userProfile?.subscription?.plan === "starter"
-                          ? "Starter Plan"
-                          : userProfile?.subscription?.plan === "professional"
-                          ? "Professional Plan"
-                          : userProfile?.subscription?.plan === "team"
-                          ? "Team Plan"
-                          : "Free Plan"}
-                      </span>
+                      <span className="font-medium">Free Plan</span>
                       <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        {userProfile?.subscription?.status || "Active"}
+                        Active
                       </span>
                     </div>
                     <Link
@@ -256,7 +289,7 @@ export default function Profile() {
               <div>
                 <button
                   onClick={signOut}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  className="inline-flex items-center text-sm text-red-600 hover:text-red-500"
                 >
                   Sign Out
                 </button>
