@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useAuth } from "@/lib/hooks/useSupabaseAuth";
+import { useSupabaseAuth } from "@/lib/hooks/useSupabaseAuth";
 import { useState } from "react";
 import Image from "next/image";
 import RecentProjects from "./RecentProjects";
@@ -25,7 +25,7 @@ import {
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut } = useSupabaseAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Updated navigation with Properties as the main focus
