@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/hooks/useSupabaseAuth";
 import { getProjects, PropertyProject } from "@/lib/supabase/supabaseUtils";
@@ -17,6 +17,37 @@ export default function RecentProjects() {
   const [isExpanded, setIsExpanded] = useState(true);
   const MAX_PROJECTS = 5;
 
+  // Memoize the fetch function to avoid recreating it on every render
+  const fetchProjects = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      setIsLoading(true);
+      const data = await getProjects(user.id);
+      setProjects(data as PropertyProject[]);
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  // Handle visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && user) {
+        console.log("RecentProjects: Tab became visible, refreshing data...");
+        fetchProjects();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchProjects, user]);
+
   useEffect(() => {
     if (user) {
       fetchProjects();
@@ -24,19 +55,7 @@ export default function RecentProjects() {
       setProjects([]);
       setIsLoading(false);
     }
-  }, [user]);
-
-  const fetchProjects = async () => {
-    try {
-      setIsLoading(true);
-      const data = await getProjects(user!.id);
-      setProjects(data as PropertyProject[]);
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [user, fetchProjects]);
 
   if (!user) return null;
 

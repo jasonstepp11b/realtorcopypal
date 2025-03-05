@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useEffect, useState } from "react";
+import React, { createContext, useEffect, useState, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "../supabase/supabase";
 import {
@@ -19,6 +19,7 @@ interface AuthContextType {
   session: Session | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  refreshSession: () => Promise<void>;
   signUpWithEmail: (
     email: string,
     password: string,
@@ -35,6 +36,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   userProfile: null,
   loading: false,
+  refreshSession: async () => {},
   signUpWithEmail: async () => {},
   signInWithEmail: async () => {},
   resetPassword: async () => {},
@@ -48,6 +50,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Function to fetch user profile
+  const fetchUserProfile = useCallback(async (userId: string) => {
+    try {
+      const profile = await getUserProfile(userId);
+      setUserProfile(profile);
+      return profile;
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      return null;
+    }
+  }, []);
+
+  // Function to refresh the session
+  const refreshSession = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data } = await supabase.auth.refreshSession();
+      const { session } = data;
+
+      if (session) {
+        setSession(session);
+        setUser(session.user);
+
+        // Refresh user profile
+        if (session.user) {
+          await fetchUserProfile(session.user.id);
+        }
+
+        console.log("Session refreshed successfully");
+      }
+    } catch (error) {
+      console.error("Error refreshing session:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchUserProfile]);
+
+  // Handle visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && user) {
+        console.log("Auth context: Tab became visible, refreshing session...");
+        refreshSession();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [refreshSession, user]);
+
   useEffect(() => {
     // Set initial session from local storage
     const initialSession = supabase.auth.getSession();
@@ -60,9 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         Cookies.set("auth_token", "true", { expires: 7, sameSite: "strict" });
 
         // Fetch user profile
-        getUserProfile(session.user.id).then((profile) => {
-          setUserProfile(profile);
-        });
+        fetchUserProfile(session.user.id);
 
         // Track sign-in event
         trackEvent("user_signed_in", { method: "session_restored" });
@@ -83,8 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         Cookies.set("auth_token", "true", { expires: 7, sameSite: "strict" });
 
         // Fetch user profile
-        const profile = await getUserProfile(session.user.id);
-        setUserProfile(profile);
+        await fetchUserProfile(session.user.id);
 
         if (event === "SIGNED_IN") {
           trackEvent("user_signed_in", { method: "auth_state_change" });
@@ -105,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchUserProfile]);
 
   const signUpWithEmail = async (
     email: string,
@@ -183,6 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         userProfile,
         loading,
+        refreshSession,
         signUpWithEmail,
         signInWithEmail,
         resetPassword,

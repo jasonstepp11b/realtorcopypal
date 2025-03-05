@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useSupabaseAuth";
 import { getGenerations, deleteGeneration } from "@/lib/supabase/supabaseUtils";
@@ -99,27 +99,8 @@ export default function Dashboard() {
   const [recentProjects, setRecentProjects] = useState<PropertyProject[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
 
-  useEffect(() => {
-    // If auth is still loading, wait
-    if (loading) return;
-
-    // If user is not logged in, redirect to sign-in page
-    if (!user && !loading) {
-      router.push("/auth/sign-in");
-      return;
-    }
-
-    if (user) {
-      fetchListings();
-      fetchRecentProjects();
-    } else {
-      // Use mock data for development or when not signed in
-      setSavedListings(mockListings);
-      setIsLoading(false);
-    }
-  }, [user, loading, router]);
-
-  const fetchListings = async () => {
+  // Memoize the fetch functions to avoid recreating them on every render
+  const fetchListings = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -160,9 +141,9 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
-  const fetchRecentProjects = async () => {
+  const fetchRecentProjects = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -175,7 +156,44 @@ export default function Dashboard() {
     } finally {
       setIsLoadingProjects(false);
     }
-  };
+  }, [user]);
+
+  // Handle visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && user) {
+        console.log("Tab became visible, refreshing data...");
+        fetchListings();
+        fetchRecentProjects();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchListings, fetchRecentProjects, user]);
+
+  useEffect(() => {
+    // If auth is still loading, wait
+    if (loading) return;
+
+    // If user is not logged in, redirect to sign-in page
+    if (!user && !loading) {
+      router.push("/auth/sign-in");
+      return;
+    }
+
+    if (user) {
+      fetchListings();
+      fetchRecentProjects();
+    } else {
+      // Use mock data for development or when not signed in
+      setSavedListings(mockListings);
+      setIsLoading(false);
+    }
+  }, [user, loading, router, fetchListings, fetchRecentProjects]);
 
   const handleDelete = async (id: string) => {
     if (!user) return;
