@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/lib/hooks/useSupabaseAuth";
+import { useAuth } from "@/lib/hooks/useAuth";
 import { EnvelopeIcon, LockClosedIcon } from "@heroicons/react/24/outline";
 
 export default function SignIn() {
