@@ -8,7 +8,7 @@ const DEFAULT_BUCKET = "property-images";
 // Create a Supabase client with admin privileges
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
 /**
