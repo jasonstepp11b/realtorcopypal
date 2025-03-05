@@ -24,6 +24,7 @@ import {
 import { ReactNode } from "react";
 import UsageStats from "../components/UsageStats";
 import { getProjects, PropertyProject } from "@/lib/supabase/supabaseUtils";
+import ImageUploader from "../components/ImageUploader";
 
 interface SavedListing {
   id: string;
@@ -441,6 +442,22 @@ export default function Dashboard() {
               clients, and close more deals.
             </p>
           </Link>
+        </div>
+
+        {/* Example of using the ImageUploader component */}
+        <div className="mt-8 p-6 bg-white rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-4">Upload Profile Image</h2>
+          <p className="text-gray-600 mb-4">
+            Upload a profile image to personalize your account. The image will
+            be stored securely in Supabase.
+          </p>
+          <ImageUploader
+            buttonLabel="Upload Profile Image"
+            pathPrefix="profiles/"
+            showPreview={true}
+            className="mt-4"
+            skipAuthCheck={true}
+          />
         </div>
       </div>
     </div>

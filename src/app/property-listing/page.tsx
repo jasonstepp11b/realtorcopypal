@@ -111,6 +111,13 @@ export default function PropertyListingPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
+      {/* Add LoadingOverlay for generation process */}
+      <LoadingOverlay
+        isLoading={isGenerating}
+        message="Generating amazing property listings..."
+        generatorType="property-listing"
+      />
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2" style={{ color: "#111827" }}>
           Property Listing Generator

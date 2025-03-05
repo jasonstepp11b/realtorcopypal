@@ -16,6 +16,22 @@ export default function LoadingOverlay({
 }: LoadingOverlayProps) {
   const [loadingStep, setLoadingStep] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
+  const [isVisible, setIsVisible] = useState(isLoading);
+
+  // Reset state when isLoading changes
+  useEffect(() => {
+    if (isLoading) {
+      setIsVisible(true);
+      setLoadingStep(0);
+      setTipIndex(0);
+    } else {
+      // Add a small delay before hiding to ensure smooth transitions
+      const timer = setTimeout(() => {
+        setIsVisible(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
 
   // Loading steps messages based on generator type
   const loadingSteps = useMemo(
@@ -75,7 +91,7 @@ export default function LoadingOverlay({
 
   // Cycle through loading steps
   useEffect(() => {
-    if (!isLoading) return;
+    if (!isVisible) return;
 
     const interval = setInterval(() => {
       setLoadingStep((prev) =>
@@ -84,20 +100,20 @@ export default function LoadingOverlay({
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isLoading, generatorType, loadingSteps]);
+  }, [isVisible, generatorType, loadingSteps]);
 
   // Cycle through tips
   useEffect(() => {
-    if (!isLoading) return;
+    if (!isVisible) return;
 
     const interval = setInterval(() => {
       setTipIndex((prev) => (prev + 1) % tips[generatorType].length);
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isLoading, generatorType, tips]);
+  }, [isVisible, generatorType, tips]);
 
-  if (!isLoading) return null;
+  if (!isVisible) return null;
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center z-50 backdrop-blur-sm">

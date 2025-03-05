@@ -2,6 +2,7 @@
 
 import { useState, FormEvent, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
+import { uploadImage, deleteImage } from "@/lib/supabase/storageUtils";
 
 interface PropertyListingFormProps {
   formData: {
@@ -16,7 +17,7 @@ interface PropertyListingFormProps {
     customTone?: string;
     askingPrice: string;
     hoaFees: string;
-    propertyImage?: string; // Base64 encoded image
+    propertyImage?: string; // URL to the image in Supabase Storage
   };
   onSubmit: (data: PropertyListingFormProps["formData"]) => void;
   isGenerating: boolean;
@@ -35,6 +36,8 @@ export default function PropertyListingForm({
   const [imagePreview, setImagePreview] = useState<string | null>(
     formData.propertyImage || null
   );
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Property type options
@@ -157,7 +160,7 @@ export default function PropertyListingForm({
   };
 
   // Handle image upload
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -167,28 +170,54 @@ export default function PropertyListingForm({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      setImagePreview(base64String);
+    try {
+      setIsUploading(true);
+      setUploadError(null);
+
+      // Upload image to Supabase Storage
+      const imageUrl = await uploadImage(file);
+
+      // Update form data with the image URL
+      setImagePreview(imageUrl);
       setLocalFormData((prev) => ({
         ...prev,
-        propertyImage: base64String,
+        propertyImage: imageUrl,
       }));
-    };
-    reader.readAsDataURL(file);
+    } catch (error: any) {
+      console.error("Error uploading image:", error);
+      setUploadError(`Failed to upload image: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // Remove uploaded image
-  const handleRemoveImage = () => {
-    setImagePreview(null);
-    setLocalFormData((prev) => {
-      const newData = { ...prev };
-      delete newData.propertyImage;
-      return newData;
-    });
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+  const handleRemoveImage = async () => {
+    if (!localFormData.propertyImage) return;
+
+    try {
+      setIsUploading(true);
+
+      // If the image is stored in Supabase, delete it
+      if (localFormData.propertyImage.includes("supabase")) {
+        await deleteImage(localFormData.propertyImage);
+      }
+
+      setImagePreview(null);
+      setLocalFormData((prev) => {
+        const newData = { ...prev };
+        delete newData.propertyImage;
+        return newData;
+      });
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error: any) {
+      console.error("Error removing image:", error);
+      setUploadError(`Failed to remove image: ${error.message}`);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -260,31 +289,33 @@ export default function PropertyListingForm({
           >
             Property Image
           </label>
-          <div className="mt-1 flex items-center">
-            <input
-              type="file"
-              id="propertyImage"
-              name="propertyImage"
-              accept="image/*"
-              onChange={handleImageUpload}
-              ref={fileInputRef}
-              className="hidden"
-            />
-            <label
-              htmlFor="propertyImage"
-              className="cursor-pointer px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-            >
-              Upload Image
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Property Image (Optional)
             </label>
-            {imagePreview && (
-              <button
-                type="button"
-                onClick={handleRemoveImage}
-                className="ml-2 text-red-600 hover:text-red-800"
-              >
-                Remove
-              </button>
-            )}
+            <div className="flex items-center space-x-4">
+              <label className="cursor-pointer px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                {isUploading ? "Uploading..." : "Upload Image"}
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  ref={fileInputRef}
+                  disabled={isUploading}
+                />
+              </label>
+              {imagePreview && (
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="text-red-600 hover:text-red-800 text-sm"
+                  disabled={isUploading}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
           </div>
           {imagePreview && (
             <div className="mt-3 relative w-full h-40">
@@ -300,6 +331,10 @@ export default function PropertyListingForm({
             Upload an image of the property (optional, max 5MB)
           </p>
         </div>
+
+        {uploadError && (
+          <div className="text-red-500 text-sm mt-2">{uploadError}</div>
+        )}
 
         <div>
           <label
