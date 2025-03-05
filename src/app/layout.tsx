@@ -3,6 +3,7 @@ import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/contexts/SupabaseAuthContext";
 import { ThemeProvider } from "@/lib/contexts/ThemeContext";
+import { VisibilityProvider } from "@/lib/contexts/VisibilityContext";
 import Sidebar from "@/components/Sidebar";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -32,16 +33,18 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} ${poppins.variable} font-sans`}>
-        <AuthProvider>
-          <ThemeProvider>
-            <div className="flex min-h-screen bg-gray-50">
-              <Sidebar />
-              <div className="flex-1 w-full">
-                <main className="w-full p-4 md:p-6 lg:p-8">{children}</main>
+        <VisibilityProvider>
+          <AuthProvider>
+            <ThemeProvider>
+              <div className="flex min-h-screen bg-gray-50">
+                <Sidebar />
+                <div className="flex-1 w-full">
+                  <main className="w-full p-4 md:p-6 lg:p-8">{children}</main>
+                </div>
               </div>
-            </div>
-          </ThemeProvider>
-        </AuthProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </VisibilityProvider>
       </body>
     </html>
   );

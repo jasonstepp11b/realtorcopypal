@@ -1,25 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useAuth } from "@/lib/hooks/useSupabaseAuth";
-import { getProjects, PropertyProject } from "@/lib/supabase/supabaseUtils";
-import {
-  BuildingOffice2Icon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-} from "@heroicons/react/24/outline";
+import Image from "next/image";
+import { useSupabaseAuth } from "@/lib/hooks/useSupabaseAuth";
+import { getProjects } from "@/lib/supabase/supabaseUtils";
+import { PropertyProject } from "@/types/property";
+import LoadingSpinner from "./ui/LoadingSpinner";
+import { BuildingOffice2Icon, PlusIcon } from "@heroicons/react/24/outline";
 
-export default function RecentProjects() {
-  const { user } = useAuth();
+const RecentProjects: React.FC = () => {
+  const { user, session, refreshSession } = useSupabaseAuth();
   const [projects, setProjects] = useState<PropertyProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(true);
-  const MAX_PROJECTS = 5;
 
-  // Memoize the fetch function to avoid recreating it on every render
+  // Memoize the fetch function
   const fetchProjects = useCallback(async () => {
-    if (!user) return;
+    if (!user?.id) return;
 
     try {
       setIsLoading(true);
@@ -30,14 +27,28 @@ export default function RecentProjects() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user?.id]);
 
-  // Handle visibility change
+  // Initial data fetch
   useEffect(() => {
-    const handleVisibilityChange = () => {
+    if (user && session) {
+      console.log("RecentProjects: Loading initial projects data");
+      fetchProjects();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user, session, fetchProjects]);
+
+  // Handle visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
       if (document.visibilityState === "visible" && user) {
-        console.log("RecentProjects: Tab became visible, refreshing data...");
-        fetchProjects();
+        console.log("RecentProjects: Tab visible, refreshing data");
+        // Make sure we have a valid session
+        await refreshSession();
+        if (user && session) {
+          fetchProjects();
+        }
       }
     };
 
@@ -46,77 +57,95 @@ export default function RecentProjects() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [fetchProjects, user]);
+  }, [user, session, fetchProjects, refreshSession]);
 
-  useEffect(() => {
-    if (user) {
-      fetchProjects();
-    } else {
-      setProjects([]);
-      setIsLoading(false);
-    }
-  }, [user, fetchProjects]);
+  if (isLoading) {
+    return (
+      <div className="py-8 flex justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="bg-white shadow-sm rounded-lg px-6 py-8">
+        <p className="text-center text-gray-600">
+          Please sign in to view your recent projects.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="mt-2">
-      <div
-        className="flex items-center justify-between px-4 py-2 text-sm font-medium text-gray-300 cursor-pointer hover:text-white"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <span>Recent Properties</span>
-        {isExpanded ? (
-          <ChevronUpIcon className="h-4 w-4" />
-        ) : (
-          <ChevronDownIcon className="h-4 w-4" />
-        )}
+    <div className="bg-white shadow-sm rounded-lg px-6 py-8">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+        <h2 className="text-xl font-bold text-gray-900">Recent Projects</h2>
+        <Link
+          href="/projects/new"
+          className="mt-4 md:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+        >
+          <PlusIcon className="h-5 w-5 mr-2" />
+          New Project
+        </Link>
       </div>
 
-      {isExpanded && (
-        <div className="mt-1 space-y-1">
-          {isLoading ? (
-            <div className="px-4 py-2">
-              <div className="animate-pulse space-y-2">
-                <div className="h-3 bg-gray-700 rounded"></div>
-                <div className="h-3 bg-gray-700 rounded w-5/6"></div>
-                <div className="h-3 bg-gray-700 rounded w-4/6"></div>
+      {projects.length === 0 ? (
+        <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+          <BuildingOffice2Icon className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">
+            No projects
+          </h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Get started by creating a new property project
+          </p>
+          <div className="mt-6">
+            <Link
+              href="/projects/new"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+            >
+              <PlusIcon className="h-5 w-5 mr-2" />
+              Create Project
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {projects.slice(0, 3).map((project) => (
+            <div
+              key={project.id}
+              className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+            >
+              {project.image_url && (
+                <div className="relative h-40 w-full">
+                  <Image
+                    src={project.image_url}
+                    alt={project.name}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              )}
+              <div className="p-4">
+                <Link href={`/projects/${project.id}`}>
+                  <h3 className="text-lg font-medium text-gray-900 hover:text-blue-600 truncate">
+                    {project.name}
+                  </h3>
+                </Link>
+                <p className="mt-1 text-sm text-gray-500 truncate">
+                  {project.address}
+                </p>
+                <div className="mt-4 flex justify-between text-sm text-gray-500">
+                  <span>{project.property_type}</span>
+                  <span>${project.listing_price.toLocaleString()}</span>
+                </div>
               </div>
             </div>
-          ) : projects.length === 0 ? (
-            <div className="px-4 py-2 text-xs text-gray-400">
-              No properties yet
-            </div>
-          ) : (
-            projects.slice(0, MAX_PROJECTS).map((project) => (
-              <Link
-                key={project.id}
-                href={`/projects/${project.id}`}
-                className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-              >
-                <BuildingOffice2Icon className="mr-2 h-4 w-4 text-gray-400" />
-                <span className="truncate">{project.name}</span>
-              </Link>
-            ))
-          )}
-
-          <Link
-            href="/projects/new"
-            className="flex items-center px-4 py-2 text-sm text-blue-400 hover:bg-gray-700 hover:text-blue-300"
-          >
-            + New Property
-          </Link>
-
-          {projects.length > 0 && (
-            <Link
-              href="/projects"
-              className="flex items-center px-4 py-2 text-sm text-gray-400 hover:bg-gray-700 hover:text-gray-300"
-            >
-              View all properties
-            </Link>
-          )}
+          ))}
         </div>
       )}
     </div>
   );
-}
+};
+
+export default RecentProjects;

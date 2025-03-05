@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useEffect, useState, useCallback } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "../supabase/supabase";
 import {
@@ -12,13 +18,15 @@ import {
   trackEvent,
   UserProfile,
 } from "../supabase/supabaseUtils";
-import Cookies from "js-cookie";
+import { useRouter } from "next/navigation";
+import { setCookie, destroyCookie } from "nookies";
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   userProfile: UserProfile | null;
+  session: Session | null;
   loading: boolean;
+  signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
   signUpWithEmail: (
     email: string,
@@ -28,29 +36,21 @@ interface AuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
-  signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  session: null,
-  userProfile: null,
-  loading: false,
-  refreshSession: async () => {},
-  signUpWithEmail: async () => {},
-  signInWithEmail: async () => {},
-  resetPassword: async () => {},
-  updatePassword: async () => {},
-  signOut: async () => {},
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export { AuthContext };
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  // Function to fetch user profile
+  // Fetch user profile based on user id
   const fetchUserProfile = useCallback(async (userId: string) => {
     try {
       const profile = await getUserProfile(userId);
@@ -62,89 +62,136 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Function to refresh the session
+  // Session refresh function - called when tab becomes visible
   const refreshSession = useCallback(async () => {
+    console.log("Manually refreshing session from context");
     try {
-      setLoading(true);
-      const { data } = await supabase.auth.refreshSession();
-      const { session } = data;
+      const { data, error } = await supabase.auth.getSession();
 
-      if (session) {
-        setSession(session);
-        setUser(session.user);
+      if (error) {
+        throw error;
+      }
 
-        // Refresh user profile
-        if (session.user) {
-          await fetchUserProfile(session.user.id);
+      if (data?.session) {
+        setSession(data.session);
+        setUser(data.session.user);
+        // Update the auth cookie
+        setCookie(null, "supabase-auth", "true", {
+          maxAge: 30 * 24 * 60 * 60,
+          path: "/",
+        });
+        // Fetch user profile if we have a user
+        if (data.session.user.id) {
+          await fetchUserProfile(data.session.user.id);
         }
-
         console.log("Session refreshed successfully");
+      } else {
+        setSession(null);
+        setUser(null);
+        setUserProfile(null);
+        destroyCookie(null, "supabase-auth");
       }
     } catch (error) {
       console.error("Error refreshing session:", error);
+      setSession(null);
+      setUser(null);
+      setUserProfile(null);
+      destroyCookie(null, "supabase-auth");
     } finally {
       setLoading(false);
     }
   }, [fetchUserProfile]);
 
-  // Handle visibility change
+  // Listen for visibility changes to refresh session
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && user) {
-        console.log("Auth context: Tab became visible, refreshing session...");
-        refreshSession();
+    if (typeof window !== "undefined") {
+      const handleVisibilityChange = async () => {
+        if (document.visibilityState === "visible") {
+          console.log("Tab visible - checking auth session from context");
+          await refreshSession();
+        }
+      };
+
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      return () => {
+        document.removeEventListener(
+          "visibilitychange",
+          handleVisibilityChange
+        );
+      };
+    }
+  }, [refreshSession]);
+
+  // Set the initial session and subscribe to auth changes
+  useEffect(() => {
+    setLoading(true);
+
+    // Try to get the initial session and set the user
+    const initializeAuth = async () => {
+      try {
+        // Get initial session (this gets from localStorage first)
+        const {
+          data: { session: initialSession },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error) {
+          throw error;
+        }
+
+        if (initialSession) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+          setCookie(null, "supabase-auth", "true", {
+            maxAge: 30 * 24 * 60 * 60,
+            path: "/",
+          });
+
+          // Fetch user profile if we have a user
+          if (initialSession.user.id) {
+            await fetchUserProfile(initialSession.user.id);
+          }
+
+          // Track sign-in event
+          trackEvent("user_signed_in", { method: "session_restored" });
+        }
+      } catch (error) {
+        console.error("Error initializing auth:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    initializeAuth();
 
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [refreshSession, user]);
-
-  useEffect(() => {
-    // Set initial session from local storage
-    const initialSession = supabase.auth.getSession();
-    initialSession.then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        // Set auth cookie
-        Cookies.set("auth_token", "true", { expires: 7, sameSite: "strict" });
-
-        // Fetch user profile
-        fetchUserProfile(session.user.id);
-
-        // Track sign-in event
-        trackEvent("user_signed_in", { method: "session_restored" });
-      }
-
-      setLoading(false);
-    });
-
-    // Listen for auth changes
+    // Set up the auth state change listener
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log("Auth state changed:", event);
 
-      if (session?.user) {
-        // Set auth cookie
-        Cookies.set("auth_token", "true", { expires: 7, sameSite: "strict" });
+      if (newSession) {
+        setSession(newSession);
+        setUser(newSession.user);
+        setCookie(null, "supabase-auth", "true", {
+          maxAge: 30 * 24 * 60 * 60,
+          path: "/",
+        });
 
-        // Fetch user profile
-        await fetchUserProfile(session.user.id);
+        // Fetch user profile if we have a user
+        if (newSession.user?.id) {
+          await fetchUserProfile(newSession.user.id);
+        }
 
+        // Track sign-in event
         if (event === "SIGNED_IN") {
           trackEvent("user_signed_in", { method: "auth_state_change" });
         }
       } else {
-        // Remove auth cookie
-        Cookies.remove("auth_token");
+        setSession(null);
+        setUser(null);
         setUserProfile(null);
+        destroyCookie(null, "supabase-auth");
 
         if (event === "SIGNED_OUT") {
           trackEvent("user_signed_out");
@@ -154,10 +201,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
+    // Cleanup: unsubscribe on component unmount
     return () => {
       subscription.unsubscribe();
     };
-  }, [fetchUserProfile]);
+  }, [fetchUserProfile, router]);
 
   const signUpWithEmail = async (
     email: string,
@@ -209,43 +257,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Sign out function
   const signOut = async () => {
     try {
-      setLoading(true);
-
       // Track sign-out event
       trackEvent("user_signed_out");
 
-      // Remove auth cookie
-      Cookies.remove("auth_token");
-
       await supabase.auth.signOut();
-      // Auth state listener will handle updating the user state
+      setUser(null);
+      setSession(null);
+      setUserProfile(null);
+      destroyCookie(null, "supabase-auth");
+      router.push("/");
     } catch (error) {
-      console.error("Error signing out", error);
-      setLoading(false);
-      throw error;
+      console.error("Error signing out:", error);
     }
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        userProfile,
-        loading,
-        refreshSession,
-        signUpWithEmail,
-        signInWithEmail,
-        resetPassword,
-        updatePassword,
-        signOut,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-}
+  const value = {
+    user,
+    userProfile,
+    session,
+    loading,
+    signOut,
+    refreshSession,
+    signUpWithEmail,
+    signInWithEmail,
+    resetPassword,
+    updatePassword,
+  };
 
-export { AuthContext };
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useSupabaseAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useSupabaseAuth must be used within an AuthProvider");
+  }
+  return context;
+};

@@ -5,7 +5,7 @@ import Image from "next/image";
 import { uploadImage } from "@/lib/supabase/storageUtils";
 import dynamic from "next/dynamic";
 
-// Create a safe auth hook that doesn't depend on Firebase being available
+// Create a safe auth hook that uses Supabase instead of Firebase
 function useSafeAuth() {
   const [user, setUser] = useState<any>(null);
   const [authAvailable, setAuthAvailable] = useState<boolean>(false);
@@ -16,8 +16,8 @@ function useSafeAuth() {
       // Use a self-invoking async function to handle the dynamic import
       (async () => {
         try {
-          // Try to dynamically import the auth module
-          const authModule = await import("@/lib/hooks/useAuth").catch(
+          // Try to dynamically import the Supabase auth module
+          const authModule = await import("@/lib/hooks/useSupabaseAuth").catch(
             () => null
           );
 
@@ -28,11 +28,11 @@ function useSafeAuth() {
               setUser(authContext.user);
               setAuthAvailable(true);
             } catch (error) {
-              console.warn("Auth context not available:", error);
+              console.warn("Supabase Auth context not available:", error);
             }
           }
         } catch (error) {
-          console.warn("Auth module could not be loaded:", error);
+          console.warn("Supabase Auth module could not be loaded:", error);
         }
       })();
     }

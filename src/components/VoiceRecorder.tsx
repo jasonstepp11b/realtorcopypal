@@ -1,13 +1,24 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useDeepgram } from '../lib/contexts/DeepgramContext';
-import { addDocument } from '../lib/firebase/firebaseUtils';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from "react";
+import { useDeepgram } from "../lib/contexts/DeepgramContext";
+import { createClient } from "@supabase/supabase-js";
+import { motion } from "framer-motion";
 
 export default function VoiceRecorder() {
   const [isRecording, setIsRecording] = useState(false);
-  const { connectToDeepgram, disconnectFromDeepgram, connectionState, realtimeTranscript } = useDeepgram();
+  const {
+    connectToDeepgram,
+    disconnectFromDeepgram,
+    connectionState,
+    realtimeTranscript,
+  } = useDeepgram();
+
+  // Initialize Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+  );
 
   const handleStartRecording = async () => {
     await connectToDeepgram();
@@ -17,13 +28,23 @@ export default function VoiceRecorder() {
   const handleStopRecording = async () => {
     disconnectFromDeepgram();
     setIsRecording(false);
-    
-    // Save the note to Firebase
+
+    // Save the note to Supabase
     if (realtimeTranscript) {
-      await addDocument('notes', {
-        text: realtimeTranscript,
-        timestamp: new Date().toISOString(),
-      });
+      try {
+        const { data, error } = await supabase.from("notes").insert([
+          {
+            text: realtimeTranscript,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+
+        if (error) {
+          console.error("Error saving note:", error);
+        }
+      } catch (error) {
+        console.error("Error saving note:", error);
+      }
     }
   };
 
@@ -32,10 +53,12 @@ export default function VoiceRecorder() {
       <button
         onClick={isRecording ? handleStopRecording : handleStartRecording}
         className={`w-full py-2 px-4 rounded-full ${
-          isRecording ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'
+          isRecording
+            ? "bg-red-500 hover:bg-red-600"
+            : "bg-blue-500 hover:bg-blue-600"
         } text-white font-bold`}
       >
-        {isRecording ? 'Stop Recording' : 'Start Recording'}
+        {isRecording ? "Stop Recording" : "Start Recording"}
       </button>
       {isRecording && (
         <div className="mt-4 p-4 bg-gray-100 rounded-lg">

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import ImageUploader from "./ImageUploader";
 import ImageDisplay from "./ImageDisplay";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/lib/hooks/useSupabaseAuth";
 
 interface PropertyImageUploaderProps {
   /** Property ID to organize images */
